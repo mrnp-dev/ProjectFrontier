@@ -513,39 +513,41 @@ namespace ProjectFrontier.Editor
 
             var pauseCard = CreateImage(pauseRoot.transform, "PauseCard", uiPanel, FrontierPalette.SlatePanel, raycast: true);
             pauseCard.type = UnityEngine.UI.Image.Type.Sliced;
-            SetAnchored(pauseCard.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(680f, 560f));
+            SetAnchored(pauseCard.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(680f, 600f));
 
             var pauseHeader = CreateStyledTmp(pauseCard.transform, "PauseTitle", "PAUSED · SETTINGS & GRAPHICS", 30f, FrontierPalette.HearthGold, TextAlignmentOptions.Center);
             SetAnchored(pauseHeader.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -18f), new Vector2(620f, 42f));
 
             // Graphics Preset Buttons row
             shell.presetLowButton = CreateStyledButton(pauseCard.transform, "PresetLowBtn", uiPanel, "LOW", 18f, FrontierPalette.SlatePanel, FrontierPalette.CreamParchment, out _);
-            SetAnchored(shell.presetLowButton.GetComponent<RectTransform>(), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(-216f, -76f), new Vector2(132f, 48f));
+            SetAnchored(shell.presetLowButton.GetComponent<RectTransform>(), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(-216f, -74f), new Vector2(132f, 46f));
             shell.presetMedButton = CreateStyledButton(pauseCard.transform, "PresetMedBtn", uiPanel, "MEDIUM", 18f, FrontierPalette.SlatePanel, FrontierPalette.CreamParchment, out _);
-            SetAnchored(shell.presetMedButton.GetComponent<RectTransform>(), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(-72f, -76f), new Vector2(132f, 48f));
+            SetAnchored(shell.presetMedButton.GetComponent<RectTransform>(), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(-72f, -74f), new Vector2(132f, 46f));
             shell.presetHighButton = CreateStyledButton(pauseCard.transform, "PresetHighBtn", uiPanel, "HIGH", 18f, FrontierPalette.SlatePanel, FrontierPalette.CreamParchment, out _);
-            SetAnchored(shell.presetHighButton.GetComponent<RectTransform>(), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(72f, -76f), new Vector2(132f, 48f));
+            SetAnchored(shell.presetHighButton.GetComponent<RectTransform>(), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(72f, -74f), new Vector2(132f, 46f));
             shell.presetCustomButton = CreateStyledButton(pauseCard.transform, "PresetCustomBtn", uiPanel, "CUSTOM", 18f, FrontierPalette.SlatePanel, FrontierPalette.CreamParchment, out _);
-            SetAnchored(shell.presetCustomButton.GetComponent<RectTransform>(), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(216f, -76f), new Vector2(132f, 48f));
+            SetAnchored(shell.presetCustomButton.GetComponent<RectTransform>(), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(216f, -74f), new Vector2(132f, 46f));
 
-            shell.presetDetailsText = CreateStyledTmp(pauseCard.transform, "PresetDetails", "LOW · 30 FPS · 2D Lights: OFF · PostFX: OFF", 16f, FrontierPalette.CreamParchment, TextAlignmentOptions.Center);
-            SetAnchored(shell.presetDetailsText.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -134f), new Vector2(620f, 30f));
+            shell.presetDetailsText = CreateStyledTmp(pauseCard.transform, "PresetDetails", "LOW · 30 FPS · 2D Lights: OFF · PostFX: OFF · FX: 25%", 15f, FrontierPalette.CreamParchment, TextAlignmentOptions.Center);
+            SetAnchored(shell.presetDetailsText.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -128f), new Vector2(640f, 28f));
 
-            // Custom Toggles Row
+            // Custom Toggles 2x2 Grid (FPS, 2D Lights, Post-FX, Particle Density)
             var customGrp = new GameObject("CustomGraphicsGroup", typeof(RectTransform));
             customGrp.transform.SetParent(pauseCard.transform, false);
-            SetAnchored(customGrp.GetComponent<RectTransform>(), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -172f), new Vector2(600f, 48f));
+            SetAnchored(customGrp.GetComponent<RectTransform>(), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -162f), new Vector2(600f, 92f));
             shell.customGraphicsGroup = customGrp;
             shell.customFpsButton = CreateStyledButton(customGrp.transform, "CustomFpsBtn", uiPanel, "FPS: 30", 16f, FrontierPalette.DeepPine, FrontierPalette.CreamParchment, out shell.customFpsLabel);
-            SetAnchored(shell.customFpsButton.GetComponent<RectTransform>(), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(-195f, 0f), new Vector2(180f, 42f));
+            SetAnchored(shell.customFpsButton.GetComponent<RectTransform>(), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(-148f, 23f), new Vector2(284f, 40f));
             shell.customLightsButton = CreateStyledButton(customGrp.transform, "CustomLightsBtn", uiPanel, "2D LIGHTS: OFF", 16f, FrontierPalette.DeepPine, FrontierPalette.CreamParchment, out shell.customLightsLabel);
-            SetAnchored(shell.customLightsButton.GetComponent<RectTransform>(), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, 0f), new Vector2(185f, 42f));
+            SetAnchored(shell.customLightsButton.GetComponent<RectTransform>(), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(148f, 23f), new Vector2(284f, 40f));
             shell.customPostFxButton = CreateStyledButton(customGrp.transform, "CustomPostFxBtn", uiPanel, "POST-FX: OFF", 16f, FrontierPalette.DeepPine, FrontierPalette.CreamParchment, out shell.customPostFxLabel);
-            SetAnchored(shell.customPostFxButton.GetComponent<RectTransform>(), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(195f, 0f), new Vector2(180f, 42f));
+            SetAnchored(shell.customPostFxButton.GetComponent<RectTransform>(), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(-148f, -23f), new Vector2(284f, 40f));
+            shell.customParticlesButton = CreateStyledButton(customGrp.transform, "CustomParticlesBtn", uiPanel, "PARTICLES: 25%", 16f, FrontierPalette.DeepPine, FrontierPalette.CreamParchment, out shell.customParticlesLabel);
+            SetAnchored(shell.customParticlesButton.GetComponent<RectTransform>(), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(148f, -23f), new Vector2(284f, 40f));
 
             // Music & SFX Sliders
-            shell.musicSlider = CreateStyledSlider(pauseCard.transform, "MusicSlider", "AMBIENT / MUSIC VOL", uiSolid, new Vector2(0f, -252f));
-            shell.sfxSlider = CreateStyledSlider(pauseCard.transform, "SfxSlider", "SFX VOL", uiSolid, new Vector2(0f, -324f));
+            shell.musicSlider = CreateStyledSlider(pauseCard.transform, "MusicSlider", "AMBIENT / MUSIC VOL", uiSolid, new Vector2(0f, -284f));
+            shell.sfxSlider = CreateStyledSlider(pauseCard.transform, "SfxSlider", "SFX VOL", uiSolid, new Vector2(0f, -356f));
 
             // Pause Navigation Buttons
             shell.resumeButton = CreateStyledButton(pauseCard.transform, "ResumeBtn", uiPanel, "RESUME", 22f, FrontierPalette.FrontierTeal, FrontierPalette.CreamParchment, out _);

@@ -59,18 +59,22 @@ namespace ProjectFrontier
         public TextMeshProUGUI customLightsLabel;
         public UnityEngine.UI.Button customPostFxButton;
         public TextMeshProUGUI customPostFxLabel;
+        public UnityEngine.UI.Button customParticlesButton;
+        public TextMeshProUGUI customParticlesLabel;
 
         [Header("End Screen Elements")]
         public TextMeshProUGUI endTitleText;
         public TextMeshProUGUI endStatsText;
         public UnityEngine.UI.Button endRestartButton;
         public UnityEngine.UI.Button endTitleButton;
+        [SerializeField] private float endScreenRevealDelay = 1.45f;
 
         [Header("Transition Fade")]
         public UnityEngine.UI.Image fadeOverlay;
 
         private Coroutine _barTween;
         private Coroutine _fadeTween;
+        private Coroutine _endRevealRoutine;
         private float _displayedFill;
 
         private void Start()
@@ -145,6 +149,7 @@ namespace ProjectFrontier
             if (customFpsButton != null) customFpsButton.onClick.AddListener(ToggleCustomFps);
             if (customLightsButton != null) customLightsButton.onClick.AddListener(ToggleCustomLights);
             if (customPostFxButton != null) customPostFxButton.onClick.AddListener(ToggleCustomPostFx);
+            if (customParticlesButton != null) customParticlesButton.onClick.AddListener(CycleCustomParticles);
 
             if (musicSlider != null)
             {
@@ -228,6 +233,16 @@ namespace ProjectFrontier
             gfx.SetCustom(c.targetFps, c.dynamicLights2D, !c.postProcessing, c.particleDensity);
         }
 
+        private void CycleCustomParticles()
+        {
+            SynthAudioManager.Instance?.PlayUiClick();
+            var gfx = GraphicsSettingsManager.Instance;
+            if (gfx == null) return;
+            var c = gfx.CurrentConfig;
+            float nextDensity = c.particleDensity < 0.45f ? 0.65f : (c.particleDensity < 0.85f ? 1.0f : 0.25f);
+            gfx.SetCustom(c.targetFps, c.dynamicLights2D, c.postProcessing, nextDensity);
+        }
+
         private void HandleGraphicsChanged(GraphicsConfigData cfg)
         {
             RefreshGraphicsUi();
@@ -239,11 +254,12 @@ namespace ProjectFrontier
             if (gfx == null) return;
             var cfg = gfx.CurrentConfig;
             string label = gfx.GetShortTierLabel();
+            int particlePct = Mathf.RoundToInt(cfg.particleDensity * 100f);
 
             if (presetBadgeText != null) presetBadgeText.text = $"GFX: {label}";
             if (presetDetailsText != null)
             {
-                presetDetailsText.text = $"{label} · {cfg.targetFps} FPS · 2D Lights: {(cfg.dynamicLights2D ? "ON" : "OFF")} · PostFX: {(cfg.postProcessing ? "ON" : "OFF")}";
+                presetDetailsText.text = $"{label} · {cfg.targetFps} FPS · 2D Lights: {(cfg.dynamicLights2D ? "ON" : "OFF")} · PostFX: {(cfg.postProcessing ? "ON" : "OFF")} · FX: {particlePct}%";
             }
 
             TintPresetButton(presetLowButton, gfx.CurrentTier == GraphicsPresetTier.Low);
@@ -258,6 +274,7 @@ namespace ProjectFrontier
             if (customFpsLabel != null) customFpsLabel.text = $"FPS: {cfg.targetFps}";
             if (customLightsLabel != null) customLightsLabel.text = $"2D LIGHTS: {(cfg.dynamicLights2D ? "ON" : "OFF")}";
             if (customPostFxLabel != null) customPostFxLabel.text = $"POST-FX: {(cfg.postProcessing ? "ON" : "OFF")}";
+            if (customParticlesLabel != null) customParticlesLabel.text = $"PARTICLES: {particlePct}%";
         }
 
         private static void TintPresetButton(UnityEngine.UI.Button btn, bool selected)
@@ -277,14 +294,45 @@ namespace ProjectFrontier
 
         private void ApplyStateVisibility(RunState state, bool instant)
         {
+            if (_endRevealRoutine != null)
+            {
+                StopCoroutine(_endRevealRoutine);
+                _endRevealRoutine = null;
+            }
+
+            bool isEndState = state == RunState.Won || state == RunState.Lost;
+            bool deferEndReveal = isEndState && !instant && endScreenRevealDelay > 0.01f;
+
             if (titleRoot != null) titleRoot.SetActive(state == RunState.Ready);
             if (hudRoot != null) hudRoot.SetActive(state == RunState.Running);
             if (pauseRoot != null) pauseRoot.SetActive(state == RunState.Paused);
-            if (endRoot != null) endRoot.SetActive(state == RunState.Won || state == RunState.Lost);
+            if (endRoot != null) endRoot.SetActive(isEndState && !deferEndReveal);
             if (dialogueRoot != null && state != RunState.Running) dialogueRoot.SetActive(false);
-            if (state != RunState.Running) FeelManager.Instance?.HideTransientOverlays();
+            if (state == RunState.Ready || state == RunState.Paused) FeelManager.Instance?.HideTransientOverlays();
+
+            if (deferEndReveal)
+            {
+                _endRevealRoutine = StartCoroutine(RevealEndScreenAfterBanner(state));
+                return;
+            }
 
             if (!instant && fadeOverlay != null)
+            {
+                if (_fadeTween != null) StopCoroutine(_fadeTween);
+                _fadeTween = StartCoroutine(PlayTransitionFade());
+            }
+        }
+
+        private IEnumerator RevealEndScreenAfterBanner(RunState expectedState)
+        {
+            yield return new WaitForSecondsRealtime(endScreenRevealDelay);
+            _endRevealRoutine = null;
+            var loop = FrontierGameLoop.Instance;
+            if (loop != null && loop.State != expectedState) yield break;
+
+            if (endRoot != null) endRoot.SetActive(true);
+            RefreshEndStats();
+            if (fadeOverlay != null)
             {
                 if (_fadeTween != null) StopCoroutine(_fadeTween);
                 _fadeTween = StartCoroutine(PlayTransitionFade());
