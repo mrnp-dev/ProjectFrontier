@@ -21,6 +21,7 @@
 sysinfo.txt
 
 # Builds
+/Builds/
 *.apk
 *.aab
 *.unitypackage
@@ -49,6 +50,7 @@ ExportedObj/
 *.VC.db
 
 # Crashlytics / Android generated
+/.utmp/
 gradleOut/
 *.keystore
 *.jks
