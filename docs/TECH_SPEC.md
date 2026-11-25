@@ -101,7 +101,7 @@ One API request per player message avoids double-call latency and cost:
 }
 ```
 - **C# Guardrails:** Clamp `deltas` per turn (e.g., `[-5, +5]`), validate JSON with graceful plain-text fallback, and never allow the LLM to mutate gold, items, or quest flags directly.
-- **Implemented behaviour (#13):** measured ~340 input tokens per turn with a full 4-message history across all 5 villagers; `max_tokens: 130`; `response_format: json_object` (toggleable). Deltas are clamped to ±5 through `FrontierSocialManager.ApplyDelta(..., DeltaSource.LlmTurn)`. Plain-text or truncated replies still show the line with zero deltas. No network, an HTTP error, or no reply within 8 s falls back to the offline provider for that turn. Every turn logs `in`/`out` tokens and running averages (`[LLM] ...`).
+- **Implemented behaviour (#13):** measured ~340 input tokens per turn (estimate) and 350-410 on Groq `gpt-oss-20b` with a full 4-message history across all 5 villagers; `max_tokens: 130` (+120 when `reasoning_effort` is set for reasoning models); `response_format: json_object` (toggleable). Deltas are clamped to ±5 through `FrontierSocialManager.ApplyDelta(..., DeltaSource.LlmTurn)`. Plain-text or truncated replies still show the line with zero deltas. No network, an HTTP error, or no reply within 8 s falls back to the offline provider for that turn. Every turn logs `in`/`out` tokens and running averages (`[LLM] ...`).
 - **Key handling:** keys are never in assets or git (`.env` / `UserSettings/FrontierLlm.json`, both git-ignored). `DirectDev` (direct key) is compiled out of release builds; release builds use `Proxy`, which authenticates with the player's UGS access token while the backend holds the API key.
 
 ### Deterministic Gossip & Trust Engine (C#)

@@ -16,6 +16,22 @@ default for every build until the backend proxy ships.
    ```
 3. Enter Play Mode. The Console prints `[LLM] Provider: <model> (mode=DirectDev ... key=set ...)`. The key itself is never logged.
 
+### Reasoning models (Groq `openai/gpt-oss-*`, OpenAI o-series)
+
+These models "think" before replying, and the thinking tokens count toward `max_tokens`. At their default effort the
+thinking can use the whole 130-token cap, leaving an empty reply (Groq returns `400 Failed to validate JSON`). Set:
+
+```ini
+FRONTIER_LLM_REASONING_EFFORT=low
+```
+
+This sends `reasoning_effort: "low"` and raises `max_tokens` by `reasoningTokenAllowance` (default 120, so 250 total).
+Leave it blank for normal models: they reject the field.
+
+Tested on Groq: `openai/gpt-oss-20b` + `low` → 7/7 valid JSON turns, ~350-410 input tokens, 70-136 output tokens
+(thinking included), 0.5-0.8 s in the Editor. Free Groq tiers have per-model daily token limits; on HTTP 429 the game
+falls back to offline replies.
+
 Any OpenAI-compatible `/v1/chat/completions` endpoint works (OpenAI, Groq, OpenRouter, DeepSeek, Together, or a local
 llama.cpp / LM Studio / Ollama server). Local (`localhost` / `127.0.0.1`) endpoints need no key.
 
@@ -27,7 +43,7 @@ Lowest to highest priority:
 |---|---|---|
 | JSON file | Editor: `UserSettings/FrontierLlm.json` · device: `<persistentDataPath>/frontier_llm.json` | All fields (see below). `UserSettings/` is git-ignored. |
 | `.env` | Project root | **Editor only.** `FRONTIER_LLM_*` keys. Blank values are ignored. |
-| Environment variables | Process env of the Editor | `FRONTIER_LLM_MODE`, `FRONTIER_LLM_BASE_URL`, `FRONTIER_LLM_MODEL`, `FRONTIER_LLM_API_KEY` |
+| Environment variables | Process env of the Editor | `FRONTIER_LLM_MODE`, `FRONTIER_LLM_BASE_URL`, `FRONTIER_LLM_MODEL`, `FRONTIER_LLM_API_KEY`, `FRONTIER_LLM_REASONING_EFFORT` |
 
 JSON fields and defaults:
 
@@ -41,7 +57,9 @@ JSON fields and defaults:
   "timeoutSeconds": 8,
   "maxTokens": 130,
   "temperature": 0.8,
-  "offlineLatencyMs": 400
+  "offlineLatencyMs": 400,
+  "reasoningEffort": "",
+  "reasoningTokenAllowance": 120
 }
 ```
 
@@ -59,7 +77,7 @@ If `DirectDev` has no URL, or a remote URL without a key, the manager logs a war
 
 ## Turn contract
 
-- **Input (~340 tokens measured, budget 500):** persona card, standing line, one rumor line, the last 4 chat messages, the player's line (capped at 200 characters).
+- **Input (~340 tokens estimated; 350-410 measured by Groq's tokenizer; budget 500):** persona card, standing line, one rumor line, the last 4 chat messages, the player's line (capped at 200 characters).
 - **Output (`max_tokens: 130`):** `{"dialogue","mood","deltas":{"trust","affection","respect"},"quick_replies":[3]}`.
 - **Guardrails:** relationship changes go through `FrontierSocialManager.ApplyDelta(..., DeltaSource.LlmTurn)` and are clamped to ±5 per axis per turn. Fields outside the contract (gold, items, quest flags) are ignored. A plain-text or cut-off reply still shows the villager's line, with zero relationship change.
 - **Fallback:** no network, an HTTP error, or no answer within `timeoutSeconds` → the offline provider answers that turn and the game keeps going.

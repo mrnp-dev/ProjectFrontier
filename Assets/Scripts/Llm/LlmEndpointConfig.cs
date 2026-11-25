@@ -33,11 +33,22 @@ namespace ProjectFrontier.Llm
         public int maxTokens = TurnPromptBuilder.DefaultMaxOutputTokens;
         public float temperature = 0.8f;
         public int offlineLatencyMs = 400;
+        /// <summary>Optional "low" / "medium" / "high" for reasoning models (gpt-oss, o-series). Empty = not sent.</summary>
+        public string reasoningEffort = "";
+        /// <summary>Extra completion tokens allowed when reasoningEffort is set: reasoning tokens count toward max_tokens.</summary>
+        public int reasoningTokenAllowance = 120;
 
         public const string EnvMode = "FRONTIER_LLM_MODE";
         public const string EnvBaseUrl = "FRONTIER_LLM_BASE_URL";
         public const string EnvModel = "FRONTIER_LLM_MODEL";
         public const string EnvApiKey = "FRONTIER_LLM_API_KEY";
+        public const string EnvReasoningEffort = "FRONTIER_LLM_REASONING_EFFORT";
+
+        public bool HasReasoningEffort => !string.IsNullOrWhiteSpace(reasoningEffort);
+
+        /// <summary>max_tokens actually sent: the turn's output cap, plus the reasoning allowance for reasoning models.</summary>
+        public int EffectiveMaxTokens(int outputTokens) =>
+            HasReasoningEffort ? outputTokens + Math.Max(0, reasoningTokenAllowance) : outputTokens;
 
         public LlmMode Mode => Enum.TryParse(mode, true, out LlmMode m) ? m : LlmMode.Offline;
 
@@ -83,6 +94,7 @@ namespace ProjectFrontier.Llm
             cfg.baseUrl = Pick(EnvBaseUrl, dotEnv) ?? cfg.baseUrl;
             cfg.model = Pick(EnvModel, dotEnv) ?? cfg.model;
             cfg.apiKey = Pick(EnvApiKey, dotEnv) ?? cfg.apiKey;
+            cfg.reasoningEffort = Pick(EnvReasoningEffort, dotEnv) ?? cfg.reasoningEffort;
             return cfg;
         }
 
@@ -137,6 +149,6 @@ namespace ProjectFrontier.Llm
 
         /// <summary>Safe for logs: never includes the key.</summary>
         public override string ToString() =>
-            $"mode={Mode} url={ChatCompletionsUrl ?? "-"} model={(string.IsNullOrEmpty(model) ? "-" : model)} key={(string.IsNullOrEmpty(apiKey) ? "none" : "set")} json={jsonMode} timeout={timeoutSeconds}s";
+            $"mode={Mode} url={ChatCompletionsUrl ?? "-"} model={(string.IsNullOrEmpty(model) ? "-" : model)} key={(string.IsNullOrEmpty(apiKey) ? "none" : "set")} json={jsonMode} reasoning={(HasReasoningEffort ? reasoningEffort.Trim() : "-")} timeout={timeoutSeconds}s";
     }
 }

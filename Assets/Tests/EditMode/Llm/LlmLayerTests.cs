@@ -419,6 +419,23 @@ namespace ProjectFrontier.Llm.Tests
         }
 
         [Test]
+        public void ReasoningEffortIsSentOnlyWhenSetAndWidensTokenCap()
+        {
+            var cfg = new LlmEndpointConfig { model = "gpt-oss", baseUrl = "http://x/v1" };
+            var req = new LlmRequest();
+            req.Messages.Add(new ChatMessage(ChatRole.User, "hi"));
+            string plain = new OpenAiCompatibleProvider(cfg, null).BuildBody(req);
+            StringAssert.DoesNotContain("reasoning_effort", plain);
+            StringAssert.Contains("\"max_tokens\":130", plain);
+
+            cfg.reasoningEffort = " low ";
+            string body = new OpenAiCompatibleProvider(cfg, null).BuildBody(req);
+            StringAssert.EndsWith(",\"reasoning_effort\":\"low\"}", body);
+            StringAssert.Contains("\"max_tokens\":250", body);
+            Assert.DoesNotThrow(() => JsonUtility.FromJson<LlmEndpointConfig>(body));
+        }
+
+        [Test]
         public void RequestBodyMatchesOpenAiShape()
         {
             var cfg = new LlmEndpointConfig { model = "m1", jsonMode = true, baseUrl = "http://x/v1" };

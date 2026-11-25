@@ -58,12 +58,19 @@ namespace ProjectFrontier.Llm
         {
             WireBody body = _config.jsonMode ? new WireBodyJsonMode() : new WireBody();
             body.model = _config.model;
-            body.max_tokens = request.MaxTokens;
+            body.max_tokens = _config.EffectiveMaxTokens(request.MaxTokens);
             body.temperature = request.Temperature;
             body.messages = new WireMessage[request.Messages.Count];
             for (int i = 0; i < request.Messages.Count; i++)
                 body.messages[i] = new WireMessage { role = request.Messages[i].RoleName, content = request.Messages[i].Content };
-            return JsonUtility.ToJson(body);
+            string json = JsonUtility.ToJson(body);
+            if (_config.HasReasoningEffort)
+            {
+                // JsonUtility can't omit fields, so append the optional one by hand. Wrapping in a wire object escapes it.
+                string effort = JsonUtility.ToJson(new WireFormat { type = _config.reasoningEffort.Trim() });
+                json = json.Substring(0, json.Length - 1) + ",\"reasoning_effort\":" + effort.Substring(8, effort.Length - 9) + "}";
+            }
+            return json;
         }
 
         public async Task<LlmCompletion> CompleteAsync(LlmRequest request, CancellationToken ct)
