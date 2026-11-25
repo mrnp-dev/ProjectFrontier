@@ -15,7 +15,11 @@ public static class PlayerSave
 
     // Saves `data` to the slot. False when the player is not signed in or the
     // save failed.
-    public static async Task<bool> SaveAsync<T>(T data)
+    public static Task<bool> SaveAsync<T>(T data) => SaveAsync(SlotKey, data);
+
+    // Saves `data` under a custom key (e.g. "social") so independent systems
+    // don't overwrite each other's slot.
+    public static async Task<bool> SaveAsync<T>(string key, T data)
     {
         try
         {
@@ -24,7 +28,7 @@ public static class PlayerSave
                 return false;
             }
             await CloudSaveService.Instance.Data.Player.SaveAsync(
-                new Dictionary<string, object> { { SlotKey, data } });
+                new Dictionary<string, object> { { key, data } });
             return true;
         }
         catch (Exception e)
@@ -36,7 +40,10 @@ public static class PlayerSave
 
     // Loads the slot, or `fallback` when there is no save yet, the player is
     // not signed in, or the load failed.
-    public static async Task<T> LoadAsync<T>(T fallback = default)
+    public static Task<T> LoadAsync<T>(T fallback = default) => LoadAsync(SlotKey, fallback);
+
+    // Loads a custom key, or `fallback` (see above).
+    public static async Task<T> LoadAsync<T>(string key, T fallback)
     {
         try
         {
@@ -45,8 +52,8 @@ public static class PlayerSave
                 return fallback;
             }
             var items = await CloudSaveService.Instance.Data.Player.LoadAsync(
-                new HashSet<string> { SlotKey });
-            return items.TryGetValue(SlotKey, out Item item) ? item.Value.GetAs<T>() : fallback;
+                new HashSet<string> { key });
+            return items.TryGetValue(key, out Item item) ? item.Value.GetAs<T>() : fallback;
         }
         catch (Exception e)
         {

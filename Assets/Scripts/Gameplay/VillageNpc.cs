@@ -71,6 +71,7 @@ namespace ProjectFrontier
 
         public void OnDialogueCompleted(FrontierGameLoop loop)
         {
+            FrontierSocialManager.Instance?.RecordFirstMeeting(NpcId);
             if (grantsBonusShardOnFirstTalk && !_grantedBonus && loop != null)
             {
                 _grantedBonus = true;

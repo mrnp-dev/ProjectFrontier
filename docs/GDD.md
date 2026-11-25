@@ -82,6 +82,20 @@ Instead of a single flat affection bar, C# tracks bounded relationship axes per 
 - **Friend:** Discounts, rare crafting/quest unlocks, fights alongside you during town raids.
 - **Lover:** Deep personal arc, unique home/raid support moments, high mutual defense priority.
 
+**Implemented tuning (`Social/RelationshipRules.cs`):** each axis is an int in `[-100, 100]`, starting at 0.
+
+| State | Enter when | Notes |
+|---|---|---|
+| Enemy | Trust <= -40 **or** Affection <= -50 | Hostility overrides everything else |
+| Friend | Trust >= 35 **and** Affection >= 25 **and** Respect >= -30 | No friendship without at least grudging respect |
+| Lover | Affection >= 75 **and** Trust >= 60 **and** Respect >= -30 | |
+| Neutral | otherwise | |
+
+- **Hysteresis:** an NPC keeps their current state until the axes fall 8 points past its entry line, so values near a threshold don't flicker.
+- **One rank per update:** state moves at most one step along Enemy -> Neutral -> Friend -> Lover per change.
+- **Per-update caps:** LLM turn ±5 per axis, gossip ±5, scripted game rules ±25. With these caps, LLM turns alone take at least 7 turns to move a stranger to Friend.
+- **First meeting:** the first time you finish a villager's greeting gives Trust +2 and Affection +1, once per save.
+
 ### C# Authority Over Game Rules
 The LLM generates **personality, dialogue, mood, and suggested small deltas**, while **C# enforces all state rules, clamps per-turn deltas, checks inventory/gold/quest state, and triggers unlocks**. An LLM cannot hallucinate free legendary weapons or jump an NPC from Enemy to Lover in one turn.
 
