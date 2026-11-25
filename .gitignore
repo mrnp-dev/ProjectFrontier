@@ -63,3 +63,8 @@ Thumbs.db
 /AgentScripts/
 /Assets/Captures/
 /Screenshots/
+
+# Local secrets (LLM dev key etc.) - see docs/LLM_SETUP.md
+.env
+.env.*
+!.env.example

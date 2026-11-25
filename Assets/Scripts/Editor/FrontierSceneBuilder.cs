@@ -132,6 +132,7 @@ namespace ProjectFrontier.Editor
             var feelMgr = managersGo.AddComponent<FeelManager>();
             var liveMgr = managersGo.AddComponent<FrontierLiveManager>();
             managersGo.AddComponent<FrontierSocialManager>();
+            managersGo.AddComponent<FrontierLlmManager>();
             var impulseSrc = managersGo.AddComponent<CinemachineImpulseSource>();
             feelMgr.impulseSource = impulseSrc;
 

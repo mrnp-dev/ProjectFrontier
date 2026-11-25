@@ -81,7 +81,7 @@ All game scripts live in namespace `ProjectFrontier` under `Assets/Scripts/`, pl
 
 ### Layered LLM Execution Model
 - **Layer 0 (0 tokens, deterministic C#):** Ambient barks, shop menus, schedules, inventory/gold math, relationship clamping, and NPC-to-NPC gossip propagation.
-- **Layer 1 (Streaming / Single-Call LLM):** Active player-NPC chatbox turns via a swappable C# `ILLMProvider` interface (OpenAI-compatible cloud API in production; local/mock provider for offline dev & automated tests).
+- **Layer 1 (Single-Call LLM) - implemented in #13:** Active player-NPC chatbox turns via a swappable C# `ILLMProvider` interface (`Assets/Scripts/Llm/`, assembly `ProjectFrontier.Llm`): `OpenAiCompatibleProvider` for any `/v1/chat/completions` endpoint and `MockLlmProvider` for offline play and tests. `FrontierLlmManager` (on `GameSystems`) owns the per-villager history and applies deltas. Setup, modes (`Offline` / `DirectDev` / `Proxy`) and key handling: [`docs/LLM_SETUP.md`](LLM_SETUP.md).
 - **Layer 2 (Async Background LLM):** End-of-day memory compression and Adventurers Guild quest flavor generation.
 
 ### Single-Call Structured Turn Contract
@@ -101,6 +101,8 @@ One API request per player message avoids double-call latency and cost:
 }
 ```
 - **C# Guardrails:** Clamp `deltas` per turn (e.g., `[-5, +5]`), validate JSON with graceful plain-text fallback, and never allow the LLM to mutate gold, items, or quest flags directly.
+- **Implemented behaviour (#13):** measured ~340 input tokens per turn (estimate) and 350-410 on Groq `gpt-oss-20b` with a full 4-message history across all 5 villagers; `max_tokens: 130` (+120 when `reasoning_effort` is set for reasoning models); `response_format: json_object` (toggleable). Deltas are clamped to ±5 through `FrontierSocialManager.ApplyDelta(..., DeltaSource.LlmTurn)`. Plain-text or truncated replies still show the line with zero deltas. No network, an HTTP error, or no reply within 8 s falls back to the offline provider for that turn. Every turn logs `in`/`out` tokens and running averages (`[LLM] ...`).
+- **Key handling:** keys are never in assets or git (`.env` / `UserSettings/FrontierLlm.json`, both git-ignored). `DirectDev` (direct key) is compiled out of release builds; release builds use `Proxy`, which authenticates with the player's UGS access token while the backend holds the API key.
 
 ### Deterministic Gossip & Trust Engine (C#)
 - `float[,] npcTrustMatrix` (5x5 for Bram, Mira, Aldric, Lyra, Pip).
