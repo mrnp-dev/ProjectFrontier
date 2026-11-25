@@ -1,0 +1,16 @@
+{
+    "name": "ProjectFrontier.Llm",
+    "rootNamespace": "ProjectFrontier.Llm",
+    "references": [
+        "ProjectFrontier.Social"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
