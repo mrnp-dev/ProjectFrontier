@@ -27,6 +27,18 @@ namespace ProjectFrontier
         public static readonly Color SkinWarm       = Hex("#E6C29F"); // Character faces
         public static readonly Color CobbleStone    = Hex("#8D9499"); // Plaza cobbles
 
+        // Vertical-slice cast accents (one signature hue per villager for silhouette read at 480x270)
+        public static readonly Color ForgeSoot      = Hex("#4A4F55"); // Bram's work shirt, forge roof
+        public static readonly Color EmberOrange    = Hex("#E07A2F"); // Forge glow, Bram's beard
+        public static readonly Color TavernWine     = Hex("#8E3B4A"); // Mira's dress, tavern roof
+        public static readonly Color AuburnHair     = Hex("#A0472E"); // Mira's hair
+        public static readonly Color SteelPlate     = Hex("#A3ADB5"); // Aldric's helm & breastplate
+        public static readonly Color GuildNavy      = Hex("#2E4A7A"); // Aldric's cape, guild hall roof
+        public static readonly Color RivalViolet    = Hex("#5B3F7A"); // Lyra's jerkin & headband
+        public static readonly Color PlatinumHair   = Hex("#E3D9B8"); // Lyra's hair
+        public static readonly Color HerbOlive      = Hex("#7A8F3A"); // Pip's robe, stall awning
+        public static readonly Color SandyHair      = Hex("#C9A35A"); // Pip's hair
+
         public static Color WithAlpha(Color c, float a) => new Color(c.r, c.g, c.b, a);
 
         private static Color Hex(string hex)

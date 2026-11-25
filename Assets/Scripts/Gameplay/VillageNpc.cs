@@ -10,15 +10,18 @@ namespace ProjectFrontier
     {
         public static readonly List<VillageNpc> AllNpcs = new List<VillageNpc>();
 
-        public string NpcId = "elder_rowan";
-        public string DisplayName = "Elder Rowan";
-        public string RoleTitle = "Hearth Keeper";
-        public string[] DialogueLines = new[]
-        {
-            "Welcome to Oakhaven, traveler. Dusk settles fast on the frontier.",
-            "Gather 5 Lantern Shards around the square to rekindle the Hearth before nightfall!"
-        };
+        private static readonly string[] FallbackLines = { "..." };
+
+        [Tooltip("Persona card asset (Assets/Data/Personas). Identity and greeting come from here.")]
+        public NpcPersona persona;
         public bool grantsBonusShardOnFirstTalk = false;
+
+        public string NpcId => persona != null ? persona.npcId : name;
+        public string DisplayName => persona != null ? persona.displayName : name;
+        public string RoleTitle => persona != null ? persona.roleTitle : string.Empty;
+        public string[] DialogueLines => persona != null && persona.greetingLines != null && persona.greetingLines.Length > 0
+            ? persona.greetingLines
+            : FallbackLines;
         public Transform promptIndicator;
 
         private bool _grantedBonus;

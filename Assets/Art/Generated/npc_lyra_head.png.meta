@@ -1,10 +1,10 @@
 fileFormatVersion: 2
-guid: 9336902c1af241897894be2e6d70c316
+guid: bb9f3ad1215eb22e2a1140ce8631b9cf
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: -4501299617070840774
-    second: elder_head_0
+      213: 2005432593856419335
+    second: npc_lyra_head_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -113,12 +113,12 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: elder_head_0
+      name: npc_lyra_head_0
       rect:
         serializedVersion: 2
-        x: 0
+        x: 1
         y: 0
-        width: 14
+        width: 13
         height: 12
       alignment: 0
       pivot: {x: 0, y: 0}
@@ -128,8 +128,8 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: a3404e0e8db2881c0800000000000000
-      internalID: -4501299617070840774
+      spriteID: 7065dc1a15ab4db10800000000000000
+      internalID: 2005432593856419335
       vertices: []
       indices: 
       edges: []
@@ -148,7 +148,7 @@ TextureImporter:
     spriteCustomMetadata:
       entries: []
     nameFileIdTable:
-      elder_head_0: -4501299617070840774
+      npc_lyra_head_0: 2005432593856419335
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

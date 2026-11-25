@@ -1,0 +1,29 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9b851f6b7e8686c978d20b651fb192a6, type: 3}
+  m_Name: Lyra
+  m_EditorClassIdentifier: Assembly-CSharp::ProjectFrontier.NpcPersona
+  npcId: lyra
+  displayName: Lyra
+  roleTitle: Rival Adventurer
+  homeSpot: 4
+  gameplayTieIn: Competitive quests, dungeon co-op partner, rivalry/romance arc.
+  personality: Arrogant, sharp-tongued top adventurer. Hates losing; quietly respects
+    anyone who keeps up.
+  speechStyle: Smug and teasing. Turns everything into a contest or a bet.
+  hooks:
+  - Races you for Guild bounties
+  - Can become worst enemy, dungeon partner, or love interest
+  - Bram calls her reckless; she calls him slow
+  greetingLines:
+  - Oh look, the new hero. Cute.
+  - Bet I could light this whole square before you find a single shard.

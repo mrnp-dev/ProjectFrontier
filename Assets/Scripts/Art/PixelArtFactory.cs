@@ -3,6 +3,12 @@ using UnityEngine;
 
 namespace ProjectFrontier
 {
+    /// <summary>Signature look for each vertical-slice villager sprite.</summary>
+    public enum CastLook { Bram, Mira, Aldric, Lyra, Pip }
+
+    /// <summary>Building variants sharing the 48x44 cottage frame.</summary>
+    public enum BuildingStyle { Cottage, Forge, Tavern, GuildHall }
+
     /// <summary>
     /// Generates crisp 16-PPU pixel-art sprites at runtime (FilterMode.Point, MipMaps disabled).
     /// Enforces consistent pixel density and 1px dark (#1A1F24) outline discipline across gameplay sprites.
@@ -140,6 +146,182 @@ namespace ProjectFrontier
             });
         }
 
+        // ---------------------------------------------------------------------------------
+        // Vertical-slice cast (Bram, Mira, Aldric, Lyra, Pip): same 14x12 head/body rig as the hero
+        // so CharacterMotion2D animates them identically, but each has a unique silhouette cue
+        // (beard, bun, helm crest, ponytail, leaf hat) that reads at 480x270.
+        // ---------------------------------------------------------------------------------
+
+        public static Sprite GetCastHeadSprite(CastLook look)
+        {
+            return GetOrBuild("head_cast_" + look, 14, 12, (w, h, px) =>
+            {
+                Color skin = FrontierPalette.SkinWarm;
+                FillRect(px, w, h, 4, 2, 6, 5, skin);
+                SetPx(px, w, h, 5, 4, FrontierPalette.InkDark);
+                SetPx(px, w, h, 8, 4, FrontierPalette.InkDark);
+
+                switch (look)
+                {
+                    case CastLook.Bram:
+                        // Bald dome, soot headband, thick brows, big ember-ginger beard
+                        FillRect(px, w, h, 4, 7, 6, 2, skin);
+                        FillRect(px, w, h, 5, 9, 4, 1, skin);
+                        FillRect(px, w, h, 3, 7, 8, 1, FrontierPalette.ForgeSoot);
+                        FillRect(px, w, h, 3, 5, 1, 2, FrontierPalette.TimberDark);
+                        FillRect(px, w, h, 10, 5, 1, 2, FrontierPalette.TimberDark);
+                        FillRect(px, w, h, 4, 5, 2, 1, FrontierPalette.TimberDark);
+                        FillRect(px, w, h, 8, 5, 2, 1, FrontierPalette.TimberDark);
+                        FillRect(px, w, h, 3, 1, 8, 3, FrontierPalette.EmberOrange);
+                        FillRect(px, w, h, 4, 0, 6, 1, FrontierPalette.EmberOrange);
+                        SetPx(px, w, h, 6, 2, FrontierPalette.InkDark);
+                        SetPx(px, w, h, 7, 2, FrontierPalette.InkDark);
+                        break;
+
+                    case CastLook.Mira:
+                        // Auburn hair framing the face, tall bun with cream ribbon, rosy cheeks
+                        SetPx(px, w, h, 4, 3, Color.Lerp(skin, FrontierPalette.Terracotta, 0.55f));
+                        SetPx(px, w, h, 9, 3, Color.Lerp(skin, FrontierPalette.Terracotta, 0.55f));
+                        SetPx(px, w, h, 6, 2, FrontierPalette.TimberDark);
+                        SetPx(px, w, h, 7, 2, FrontierPalette.TimberDark);
+                        FillRect(px, w, h, 3, 6, 8, 2, FrontierPalette.AuburnHair);
+                        FillRect(px, w, h, 4, 8, 6, 1, FrontierPalette.AuburnHair);
+                        FillRect(px, w, h, 3, 3, 1, 3, FrontierPalette.AuburnHair);
+                        FillRect(px, w, h, 10, 3, 1, 3, FrontierPalette.AuburnHair);
+                        FillRect(px, w, h, 5, 9, 4, 2, FrontierPalette.AuburnHair);
+                        FillRect(px, w, h, 5, 9, 4, 1, FrontierPalette.CreamParchment);
+                        SetPx(px, w, h, 7, 10, Color.Lerp(FrontierPalette.AuburnHair, FrontierPalette.HearthGold, 0.4f));
+                        break;
+
+                    case CastLook.Aldric:
+                        // Steel helm with nasal guard, cheek guards, gold crest, grey moustache
+                        Color brim = Color.Lerp(FrontierPalette.SteelPlate, FrontierPalette.InkDark, 0.3f);
+                        FillRect(px, w, h, 3, 6, 8, 3, FrontierPalette.SteelPlate);
+                        FillRect(px, w, h, 3, 6, 8, 1, brim);
+                        FillRect(px, w, h, 4, 9, 6, 1, FrontierPalette.SteelPlate);
+                        FillRect(px, w, h, 6, 10, 2, 1, FrontierPalette.HearthGold);
+                        FillRect(px, w, h, 3, 3, 1, 3, FrontierPalette.SteelPlate);
+                        FillRect(px, w, h, 10, 3, 1, 3, FrontierPalette.SteelPlate);
+                        FillRect(px, w, h, 6, 4, 2, 2, brim);
+                        FillRect(px, w, h, 5, 2, 4, 1, FrontierPalette.CobbleStone);
+                        SetPx(px, w, h, 5, 8, FrontierPalette.CreamParchment);
+                        break;
+
+                    case CastLook.Lyra:
+                        // Platinum hair with asymmetric fringe, violet headband, ponytail, smirk
+                        FillRect(px, w, h, 3, 6, 8, 3, FrontierPalette.PlatinumHair);
+                        FillRect(px, w, h, 4, 9, 6, 1, FrontierPalette.PlatinumHair);
+                        FillRect(px, w, h, 4, 5, 2, 1, FrontierPalette.PlatinumHair);
+                        FillRect(px, w, h, 3, 4, 1, 2, FrontierPalette.PlatinumHair);
+                        FillRect(px, w, h, 10, 4, 1, 3, FrontierPalette.PlatinumHair);
+                        FillRect(px, w, h, 3, 7, 8, 1, FrontierPalette.RivalViolet);
+                        FillRect(px, w, h, 11, 3, 1, 5, FrontierPalette.PlatinumHair);
+                        FillRect(px, w, h, 12, 2, 1, 4, FrontierPalette.PlatinumHair);
+                        SetPx(px, w, h, 11, 7, FrontierPalette.RivalViolet);
+                        SetPx(px, w, h, 8, 5, FrontierPalette.InkDark);
+                        SetPx(px, w, h, 7, 2, FrontierPalette.TimberDark);
+                        SetPx(px, w, h, 8, 2, FrontierPalette.TimberDark);
+                        break;
+
+                    case CastLook.Pip:
+                        // Big floppy leaf hat with a flower, messy sandy hair, freckles
+                        SetPx(px, w, h, 4, 3, FrontierPalette.TimberWarm);
+                        SetPx(px, w, h, 9, 3, FrontierPalette.TimberWarm);
+                        SetPx(px, w, h, 6, 2, FrontierPalette.TimberDark);
+                        FillRect(px, w, h, 3, 6, 8, 1, FrontierPalette.SandyHair);
+                        SetPx(px, w, h, 3, 5, FrontierPalette.SandyHair);
+                        FillRect(px, w, h, 10, 4, 1, 2, FrontierPalette.SandyHair);
+                        FillRect(px, w, h, 1, 7, 12, 1, FrontierPalette.HerbOlive);
+                        FillRect(px, w, h, 3, 8, 8, 2, FrontierPalette.MeadowLight);
+                        FillRect(px, w, h, 5, 10, 3, 1, FrontierPalette.MeadowLight);
+                        FillRect(px, w, h, 3, 8, 8, 1, FrontierPalette.HerbOlive);
+                        SetPx(px, w, h, 9, 10, FrontierPalette.HearthGold);
+                        SetPx(px, w, h, 10, 9, FrontierPalette.CreamParchment);
+                        break;
+                }
+                ApplyOutline(px, w, h, FrontierPalette.InkDark);
+            });
+        }
+
+        public static Sprite GetCastBodySprite(CastLook look)
+        {
+            return GetOrBuild("body_cast_" + look, 14, 12, (w, h, px) =>
+            {
+                Color skin = FrontierPalette.SkinWarm;
+                switch (look)
+                {
+                    case CastLook.Bram:
+                        // Broad soot shirt, bare forearms, leather apron with straps
+                        FillRect(px, w, h, 3, 1, 8, 9, FrontierPalette.ForgeSoot);
+                        FillRect(px, w, h, 1, 4, 2, 4, skin);
+                        FillRect(px, w, h, 11, 4, 2, 4, skin);
+                        FillRect(px, w, h, 2, 7, 1, 2, FrontierPalette.ForgeSoot);
+                        FillRect(px, w, h, 11, 7, 1, 2, FrontierPalette.ForgeSoot);
+                        FillRect(px, w, h, 4, 1, 6, 7, FrontierPalette.TimberWarm);
+                        FillRect(px, w, h, 4, 8, 1, 2, FrontierPalette.TimberWarm);
+                        FillRect(px, w, h, 9, 8, 1, 2, FrontierPalette.TimberWarm);
+                        FillRect(px, w, h, 6, 3, 2, 2, FrontierPalette.TimberDark);
+                        SetPx(px, w, h, 5, 6, FrontierPalette.EmberOrange);
+                        break;
+
+                    case CastLook.Mira:
+                        // Wine dress, cream apron and collar, cuffed sleeves
+                        FillRect(px, w, h, 3, 1, 8, 9, FrontierPalette.TavernWine);
+                        FillRect(px, w, h, 2, 4, 1, 4, FrontierPalette.TavernWine);
+                        FillRect(px, w, h, 11, 4, 1, 4, FrontierPalette.TavernWine);
+                        SetPx(px, w, h, 2, 4, FrontierPalette.CreamParchment);
+                        SetPx(px, w, h, 11, 4, FrontierPalette.CreamParchment);
+                        FillRect(px, w, h, 3, 6, 8, 1, FrontierPalette.CreamParchment);
+                        FillRect(px, w, h, 5, 1, 4, 5, FrontierPalette.CreamParchment);
+                        FillRect(px, w, h, 6, 9, 2, 1, FrontierPalette.CreamParchment);
+                        SetPx(px, w, h, 6, 3, FrontierPalette.HearthGold);
+                        break;
+
+                    case CastLook.Aldric:
+                        // Navy guild cape behind a steel breastplate, brass pauldrons, gold belt
+                        FillRect(px, w, h, 2, 1, 10, 9, FrontierPalette.GuildNavy);
+                        FillRect(px, w, h, 4, 2, 6, 7, FrontierPalette.SteelPlate);
+                        FillRect(px, w, h, 5, 6, 1, 2, FrontierPalette.CreamParchment);
+                        FillRect(px, w, h, 4, 3, 6, 1, FrontierPalette.BrassBorder);
+                        FillRect(px, w, h, 6, 3, 2, 1, FrontierPalette.HearthGold);
+                        FillRect(px, w, h, 1, 8, 3, 2, FrontierPalette.BrassBorder);
+                        FillRect(px, w, h, 10, 8, 3, 2, FrontierPalette.BrassBorder);
+                        SetPx(px, w, h, 7, 6, FrontierPalette.GuildNavy);
+                        break;
+
+                    case CastLook.Lyra:
+                        // Violet jerkin, diagonal leather bandolier with gold buckle, bracers
+                        FillRect(px, w, h, 3, 1, 8, 9, FrontierPalette.RivalViolet);
+                        FillRect(px, w, h, 2, 4, 1, 4, FrontierPalette.RivalViolet);
+                        FillRect(px, w, h, 11, 4, 1, 4, FrontierPalette.RivalViolet);
+                        FillRect(px, w, h, 2, 4, 1, 2, FrontierPalette.TimberWarm);
+                        FillRect(px, w, h, 11, 4, 1, 2, FrontierPalette.TimberWarm);
+                        for (int i = 0; i < 8; i++)
+                        {
+                            SetPx(px, w, h, 3 + i, 9 - i, FrontierPalette.TimberWarm);
+                            if (4 + i <= 10) SetPx(px, w, h, 4 + i, 9 - i, FrontierPalette.TimberWarm);
+                        }
+                        SetPx(px, w, h, 6, 6, FrontierPalette.HearthGold);
+                        FillRect(px, w, h, 3, 2, 8, 1, FrontierPalette.TimberDark);
+                        break;
+
+                    case CastLook.Pip:
+                        // Olive herbalist robe, rope belt, satchel, tucked sprig
+                        FillRect(px, w, h, 3, 1, 8, 9, FrontierPalette.HerbOlive);
+                        FillRect(px, w, h, 2, 4, 1, 4, FrontierPalette.HerbOlive);
+                        FillRect(px, w, h, 11, 4, 1, 4, FrontierPalette.HerbOlive);
+                        FillRect(px, w, h, 3, 4, 8, 1, FrontierPalette.CreamParchment);
+                        for (int i = 0; i < 6; i++) SetPx(px, w, h, 9 - i, 9 - i, FrontierPalette.TimberDark);
+                        FillRect(px, w, h, 9, 1, 3, 3, FrontierPalette.TimberWarm);
+                        SetPx(px, w, h, 10, 3, FrontierPalette.BrassBorder);
+                        SetPx(px, w, h, 4, 8, FrontierPalette.MeadowLight);
+                        SetPx(px, w, h, 4, 9, FrontierPalette.HearthGold);
+                        break;
+                }
+                ApplyOutline(px, w, h, FrontierPalette.InkDark);
+            });
+        }
+
         public static Sprite GetCharacterFootSprite()
         {
             return GetOrBuild("char_foot", 6, 5, (w, h, px) =>
@@ -196,37 +378,158 @@ namespace ProjectFrontier
             });
         }
 
-        public static Sprite GetCottageSprite()
+        public static Sprite GetCottageSprite() => GetBuildingSprite(BuildingStyle.Cottage);
+
+        public static Sprite GetBuildingSprite(BuildingStyle style)
         {
-            return GetOrBuild("prop_cottage", 48, 44, (w, h, px) =>
+            string key = style == BuildingStyle.Cottage ? "prop_cottage" : "prop_building_" + style;
+            return GetOrBuild(key, 48, 44, (w, h, px) =>
             {
+                Color wall = style == BuildingStyle.Forge
+                    ? Color.Lerp(FrontierPalette.CobbleStone, FrontierPalette.ForgeSoot, 0.35f)
+                    : FrontierPalette.CreamParchment;
+                Color roof = style switch
+                {
+                    BuildingStyle.Forge => FrontierPalette.ForgeSoot,
+                    BuildingStyle.Tavern => FrontierPalette.TavernWine,
+                    BuildingStyle.GuildHall => FrontierPalette.GuildNavy,
+                    _ => FrontierPalette.Terracotta
+                };
+                Color windowGlow = style == BuildingStyle.Forge ? FrontierPalette.EmberOrange : FrontierPalette.HearthGold;
+
                 // Timber walls
-                FillRect(px, w, h, 6, 2, 36, 22, FrontierPalette.CreamParchment);
+                FillRect(px, w, h, 6, 2, 36, 22, wall);
                 FillRect(px, w, h, 6, 2, 36, 4, FrontierPalette.CobbleStone); // stone foundation
                 FillRect(px, w, h, 6, 2, 3, 22, FrontierPalette.TimberDark);  // left beam
                 FillRect(px, w, h, 39, 2, 3, 22, FrontierPalette.TimberDark); // right beam
                 FillRect(px, w, h, 22, 2, 3, 22, FrontierPalette.TimberDark); // center beam
                 // Door
                 FillRect(px, w, h, 12, 2, 8, 13, FrontierPalette.TimberDark);
-                FillRect(px, w, h, 13, 3, 6, 11, FrontierPalette.TimberWarm);
-                SetPx(px, w, h, 18, 8, FrontierPalette.HearthGold);
+                if (style == BuildingStyle.Forge)
+                {
+                    // Open forge mouth with ember glow
+                    FillRect(px, w, h, 13, 3, 6, 11, FrontierPalette.InkDark);
+                    FillRect(px, w, h, 14, 3, 4, 3, FrontierPalette.EmberOrange);
+                    FillRect(px, w, h, 15, 4, 2, 1, FrontierPalette.HearthGold);
+                }
+                else
+                {
+                    FillRect(px, w, h, 13, 3, 6, 11, FrontierPalette.TimberWarm);
+                    SetPx(px, w, h, 18, 8, FrontierPalette.HearthGold);
+                }
                 // Warm lit window
                 FillRect(px, w, h, 28, 10, 8, 7, FrontierPalette.TimberDark);
-                FillRect(px, w, h, 29, 11, 6, 5, FrontierPalette.HearthGold);
+                FillRect(px, w, h, 29, 11, 6, 5, windowGlow);
                 FillRect(px, w, h, 31, 11, 1, 5, FrontierPalette.TimberDark);
                 FillRect(px, w, h, 29, 13, 6, 1, FrontierPalette.TimberDark);
-                // Terracotta pitched roof
+                // Pitched roof
                 for (int row = 0; row < 16; row++)
                 {
                     int inset = row;
                     int x0 = 2 + inset;
                     int rw = w - 4 - inset * 2;
                     if (rw <= 2) break;
-                    Color roofCol = (row % 3 == 0) ? FrontierPalette.TimberDark : FrontierPalette.Terracotta;
+                    Color roofCol = (row % 3 == 0) ? FrontierPalette.TimberDark : roof;
                     FillRect(px, w, h, x0, 23 + row, rw, 1, roofCol);
                 }
                 // Chimney
                 FillRect(px, w, h, 33, 32, 5, 9, FrontierPalette.CobbleStone);
+
+                switch (style)
+                {
+                    case BuildingStyle.Forge:
+                        FillRect(px, w, h, 33, 41, 5, 1, FrontierPalette.EmberOrange); // hot chimney lip
+                        break;
+                    case BuildingStyle.Tavern:
+                        // Hanging sign with a foaming mug over the door
+                        FillRect(px, w, h, 10, 17, 12, 5, FrontierPalette.TimberWarm);
+                        FillRect(px, w, h, 14, 18, 3, 2, FrontierPalette.HearthGold);
+                        FillRect(px, w, h, 14, 20, 3, 1, FrontierPalette.CreamParchment);
+                        SetPx(px, w, h, 17, 19, FrontierPalette.HearthGold);
+                        break;
+                    case BuildingStyle.GuildHall:
+                        // Navy guild banner with gold emblem hanging from the center beam
+                        FillRect(px, w, h, 21, 11, 5, 10, FrontierPalette.GuildNavy);
+                        FillRect(px, w, h, 21, 20, 5, 1, FrontierPalette.BrassBorder);
+                        FillRect(px, w, h, 23, 15, 1, 3, FrontierPalette.HearthGold);
+                        FillRect(px, w, h, 22, 16, 3, 1, FrontierPalette.HearthGold);
+                        SetPx(px, w, h, 23, 11, FrontierPalette.TimberDark);
+                        break;
+                }
+                ApplyOutline(px, w, h, FrontierPalette.InkDark);
+            });
+        }
+
+        public static Sprite GetAnvilSprite()
+        {
+            return GetOrBuild("prop_anvil", 16, 12, (w, h, px) =>
+            {
+                FillRect(px, w, h, 5, 1, 6, 4, FrontierPalette.TimberDark);   // stump
+                FillRect(px, w, h, 6, 1, 1, 4, FrontierPalette.TimberWarm);
+                FillRect(px, w, h, 6, 5, 4, 2, FrontierPalette.ForgeSoot);    // waist
+                FillRect(px, w, h, 2, 7, 11, 2, FrontierPalette.ForgeSoot);   // face
+                FillRect(px, w, h, 3, 8, 9, 1, FrontierPalette.SteelPlate);   // highlight
+                FillRect(px, w, h, 1, 7, 1, 1, FrontierPalette.ForgeSoot);    // horn tip
+                FillRect(px, w, h, 7, 9, 4, 1, FrontierPalette.EmberOrange);  // glowing ingot
+                ApplyOutline(px, w, h, FrontierPalette.InkDark);
+            });
+        }
+
+        public static Sprite GetBarrelSprite()
+        {
+            return GetOrBuild("prop_barrel", 12, 14, (w, h, px) =>
+            {
+                FillRect(px, w, h, 2, 1, 8, 11, FrontierPalette.TimberWarm);
+                FillRect(px, w, h, 3, 1, 1, 11, Color.Lerp(FrontierPalette.TimberWarm, FrontierPalette.CreamParchment, 0.25f));
+                FillRect(px, w, h, 2, 3, 8, 1, FrontierPalette.TimberDark);
+                FillRect(px, w, h, 2, 9, 8, 1, FrontierPalette.TimberDark);
+                FillRect(px, w, h, 3, 12, 6, 1, FrontierPalette.TimberDark);
+                ApplyOutline(px, w, h, FrontierPalette.InkDark);
+            });
+        }
+
+        public static Sprite GetQuestBoardSprite()
+        {
+            return GetOrBuild("prop_questboard", 18, 20, (w, h, px) =>
+            {
+                FillRect(px, w, h, 2, 1, 2, 10, FrontierPalette.TimberDark);   // posts
+                FillRect(px, w, h, 14, 1, 2, 10, FrontierPalette.TimberDark);
+                FillRect(px, w, h, 1, 7, 16, 10, FrontierPalette.TimberWarm);  // board
+                FillRect(px, w, h, 1, 17, 16, 2, FrontierPalette.GuildNavy);   // guild cap
+                FillRect(px, w, h, 3, 9, 4, 5, FrontierPalette.CreamParchment); // notices
+                FillRect(px, w, h, 8, 11, 3, 4, FrontierPalette.CreamParchment);
+                FillRect(px, w, h, 12, 8, 3, 6, FrontierPalette.CreamParchment);
+                SetPx(px, w, h, 4, 13, FrontierPalette.DuskAlert);
+                SetPx(px, w, h, 9, 14, FrontierPalette.HearthGold);
+                SetPx(px, w, h, 13, 13, FrontierPalette.DuskAlert);
+                ApplyOutline(px, w, h, FrontierPalette.InkDark);
+            });
+        }
+
+        public static Sprite GetHerbStallSprite()
+        {
+            return GetOrBuild("prop_herbstall", 32, 26, (w, h, px) =>
+            {
+                FillRect(px, w, h, 3, 9, 1, 12, FrontierPalette.TimberDark);   // awning posts
+                FillRect(px, w, h, 28, 9, 1, 12, FrontierPalette.TimberDark);
+                FillRect(px, w, h, 2, 1, 28, 8, FrontierPalette.TimberWarm);   // counter front
+                FillRect(px, w, h, 2, 8, 28, 1, FrontierPalette.TimberDark);   // counter top
+                for (int x = 5; x < 28; x += 6) FillRect(px, w, h, x, 2, 1, 5, FrontierPalette.TimberDark);
+                // Potted herbs on the counter
+                int[] potX = { 5, 13, 21 };
+                for (int i = 0; i < potX.Length; i++)
+                {
+                    FillRect(px, w, h, potX[i], 9, 5, 3, FrontierPalette.Terracotta);
+                    FillRect(px, w, h, potX[i] + 1, 12, 3, 2, i == 1 ? FrontierPalette.HerbOlive : FrontierPalette.MeadowLight);
+                    SetPx(px, w, h, potX[i] + 2, 14, i == 2 ? FrontierPalette.CreamParchment : FrontierPalette.HearthGold);
+                }
+                // Striped olive/cream awning with scalloped edge
+                for (int x = 1; x < 31; x++)
+                {
+                    Color stripe = ((x - 1) / 4) % 2 == 0 ? FrontierPalette.HerbOlive : FrontierPalette.CreamParchment;
+                    FillRect(px, w, h, x, 20, 1, 4, stripe);
+                    if ((x - 1) % 4 == 1 || (x - 1) % 4 == 2) SetPx(px, w, h, x, 19, stripe);
+                }
                 ApplyOutline(px, w, h, FrontierPalette.InkDark);
             });
         }

@@ -18,7 +18,7 @@ You are a newcomer rebuilding a small homestead on the edge of **Oakhaven**, a c
 The vertical slice compresses the full game fantasy into four walkable, interconnected zones:
 
 1. **Homestead / Farmstead (West):** Small tillable crop plot, storage/crafting bench, and pet pen.
-2. **Oakhaven Village Square (Center):** Central hearth brazier, four timber cottages, Bram's Forge, Mira's Tavern, and Pip's Herb Stall. *(Milestone 1 implements the initial Village Square layout with hearth, cottages, lantern posts, and 2 starter villagers.)*
+2. **Oakhaven Village Square (Center):** Central hearth brazier, four timber cottages, Bram's Forge, Mira's Tavern, and Pip's Herb Stall. *(Implemented: hearth square ringed by Mira's Tavern (NW), the Guild Hall (NE, standing in for the North/East hall until that zone exists), Bram's Forge (SW), and Pip's cottage + herb stall (SE); Lyra holds the square.)*
 3. **Adventurers Guild Hall (North/East):** Quest board, rank ledger, and Captain Aldric's briefing desk.
 4. **Frontier Ruins Entrance (East/South):** Portal into **1 Dungeon Biome (3 procedural floors + 1 mini-boss)**.
 
@@ -29,7 +29,7 @@ The vertical slice compresses the full game fantasy into four walkable, intercon
 ### A. Milestone 1 Technical-Floor Harness *(Implemented in `c0f4cfb`)*
 Used to validate controls, feel, UI, audio, and mobile rendering before layering full RPG systems:
 - **Objective:** Collect **5 Lantern Shards** scattered around Oakhaven Square before the **90-second dusk timer** expires to light the village hearth.
-- **Starter Villagers:** `Elder Rowan` (Hearth Keeper) and `Scout Mira` (Trail Watcher), featuring proximity speech-bubble indicators and a scripted intro chatbox that can award a bonus shard.
+- **Villagers:** Originally two placeholders (`Elder Rowan`, `Scout Mira`); replaced in #11 by the 5-NPC cast below, with proximity speech-bubble indicators and a scripted greeting chatbox (Mira awards a bonus shard).
 - **State Flow:** `Title -> Running -> Paused / Settings -> Won or Lost -> Instant Restart`.
 
 ### B. Target Daily Loop *(Milestone 2 & 3)*
@@ -55,7 +55,15 @@ Depth over breadth: every villager is anchored to a gameplay system AND a web of
 | **Lyra** | Rival Adventurer | Competitive quests, dungeon co-op partner, romance/rivalry arc | Arrogant, sharp-tongued rival. Can evolve into your worst enemy, strongest dungeon ally, or lover. |
 | **Pip** | Herbalist & Beast-Keeper | Farming seeds, alchemy/potions, tameable pets | Gentle, eccentric caretaker who notices kindness to creatures and brings sustainable buffs to the homestead. |
 
-*(Note: Milestone 1 currently spawns two placeholder villagers — `Elder Rowan` and `Scout Mira` — which will transition into the 5-NPC cast in Milestone 2.)*
+**Persona cards** live as `NpcPersona` ScriptableObjects in `Assets/Data/Personas/` (`Bram`, `Mira`, `Aldric`, `Lyra`, `Pip`): id, name, role, home spot, gameplay tie-in, personality, speech style, hooks, and 2 scripted greeting lines. `NpcPersona.ToPromptCard()` renders the ~90-token persona block for the LLM turn (#13). The scene builder seeds missing cards from `NpcPersonaSeeds` and never overwrites Inspector edits.
+
+| NPC | Home spot | Signature look | Speech style |
+|---|---|---|---|
+| Bram | Forge (SW) | Bald, ember-ginger beard, leather apron | Short, gruff, forge metaphors |
+| Mira | Tavern (NW) | Auburn bun, wine dress, cream apron | Warm, teasing, calls you "love" |
+| Captain Aldric | Guild Hall (NE) | Crested steel helm, navy cape, breastplate | Clipped, military, "recruit" |
+| Lyra | Village square | Platinum ponytail, violet jerkin, bandolier | Smug, turns everything into a bet |
+| Pip | Herb stall (SE) | Leaf hat, olive robe, satchel | Soft, rambling, talks to herbs |
 
 ---
 

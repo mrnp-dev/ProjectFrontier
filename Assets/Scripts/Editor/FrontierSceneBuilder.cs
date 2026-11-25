@@ -26,6 +26,23 @@ namespace ProjectFrontier.Editor
 
         private static Sprite talkBubble;
 
+        // Home spots (world units). Buildings: Tavern NW, Guild Hall NE, Forge SW, Pip's cottage + herb stall SE.
+        private static readonly Vector3 TavernPos = new Vector3(-6.2f, 3.8f, 0f);
+        private static readonly Vector3 GuildHallPos = new Vector3(6.2f, 3.8f, 0f);
+        private static readonly Vector3 ForgePos = new Vector3(-6.5f, -4.2f, 0f);
+        private static readonly Vector3 PipCottagePos = new Vector3(6.5f, -4.2f, 0f);
+        private static readonly Vector3 HerbStallPos = new Vector3(4.3f, -4.5f, 0f);
+        private static readonly Vector3 MiraTavernSpot = new Vector3(-6.7f, 1.8f, 0f);
+        private static readonly Vector3 AldricGuildSpot = new Vector3(5.7f, 1.8f, 0f);
+        private static readonly Vector3 BramForgeSpot = new Vector3(-4.3f, -3.3f, 0f);
+        private static readonly Vector3 PipStallSpot = new Vector3(2.9f, -4.1f, 0f);
+        private static readonly Vector3 LyraSquareSpot = new Vector3(1.6f, 1.6f, 0f);
+
+        private struct HomeSpotSprites
+        {
+            public Sprite forge, tavern, guildHall, anvil, barrel, questBoard, herbStall;
+        }
+
         [MenuItem("ProjectFrontier/Rebuild Milestone 1 Village Scene")]
         public static void BuildMilestone1Scene()
         {
@@ -40,10 +57,15 @@ namespace ProjectFrontier.Editor
 
             Sprite heroBody = SaveSpriteAsset("hero_body", PixelArtFactory.GetCharacterBodySprite("hero", FrontierPalette.FrontierTeal, FrontierPalette.TimberDark));
             Sprite heroHead = SaveSpriteAsset("hero_head", PixelArtFactory.GetCharacterHeadSprite("hero", FrontierPalette.TimberDark, FrontierPalette.Terracotta));
-            Sprite elderBody = SaveSpriteAsset("elder_body", PixelArtFactory.GetCharacterBodySprite("elder", FrontierPalette.ElderIndigo, FrontierPalette.BrassBorder));
-            Sprite elderHead = SaveSpriteAsset("elder_head", PixelArtFactory.GetCharacterHeadSprite("elder", FrontierPalette.CreamParchment, FrontierPalette.ElderIndigo));
-            Sprite scoutBody = SaveSpriteAsset("scout_body", PixelArtFactory.GetCharacterBodySprite("scout", FrontierPalette.Terracotta, FrontierPalette.TimberDark));
-            Sprite scoutHead = SaveSpriteAsset("scout_head", PixelArtFactory.GetCharacterHeadSprite("scout", FrontierPalette.TimberDark, FrontierPalette.MeadowMoss));
+            // Vertical-slice cast: one baked head/body pair per villager (npc_<id>_head/body.png)
+            var castHeads = new System.Collections.Generic.Dictionary<CastLook, Sprite>();
+            var castBodies = new System.Collections.Generic.Dictionary<CastLook, Sprite>();
+            foreach (CastLook look in System.Enum.GetValues(typeof(CastLook)))
+            {
+                string id = look.ToString().ToLowerInvariant();
+                castHeads[look] = SaveSpriteAsset($"npc_{id}_head", PixelArtFactory.GetCastHeadSprite(look));
+                castBodies[look] = SaveSpriteAsset($"npc_{id}_body", PixelArtFactory.GetCastBodySprite(look));
+            }
 
             Sprite foot = SaveSpriteAsset("char_foot", PixelArtFactory.GetCharacterFootSprite());
             Sprite heroScarf = SaveSpriteAsset("hero_scarf", PixelArtFactory.GetScarfSprite(FrontierPalette.Terracotta));
@@ -51,6 +73,16 @@ namespace ProjectFrontier.Editor
 
             Sprite lanternShard = SaveSpriteAsset("pickup_lantern", PixelArtFactory.GetLanternShardSprite());
             Sprite cottage = SaveSpriteAsset("prop_cottage", PixelArtFactory.GetCottageSprite());
+            var homeSprites = new HomeSpotSprites
+            {
+                forge = SaveSpriteAsset("prop_forge", PixelArtFactory.GetBuildingSprite(BuildingStyle.Forge)),
+                tavern = SaveSpriteAsset("prop_tavern", PixelArtFactory.GetBuildingSprite(BuildingStyle.Tavern)),
+                guildHall = SaveSpriteAsset("prop_guildhall", PixelArtFactory.GetBuildingSprite(BuildingStyle.GuildHall)),
+                anvil = SaveSpriteAsset("prop_anvil", PixelArtFactory.GetAnvilSprite()),
+                barrel = SaveSpriteAsset("prop_barrel", PixelArtFactory.GetBarrelSprite()),
+                questBoard = SaveSpriteAsset("prop_questboard", PixelArtFactory.GetQuestBoardSprite()),
+                herbStall = SaveSpriteAsset("prop_herbstall", PixelArtFactory.GetHerbStallSprite())
+            };
             Sprite pine = SaveSpriteAsset("prop_pine", PixelArtFactory.GetPineTreeSprite());
             Sprite lanternPost = SaveSpriteAsset("prop_lanternpost", PixelArtFactory.GetLanternPostSprite());
             Sprite hearth = SaveSpriteAsset("prop_hearth", PixelArtFactory.GetHearthBrazierSprite());
@@ -112,7 +144,7 @@ namespace ProjectFrontier.Editor
             // Build Oakhaven Village World
             var worldRoot = new GameObject("VillageWorld");
             BuildVillageGround(worldRoot.transform, new[] { grass0, grass1, grass2 }, new[] { dirt0, dirt1 }, cobble, spriteLitMat);
-            BuildVillageProps(worldRoot.transform, cottage, pine, lanternPost, hearth, fence, spriteLitMat);
+            BuildVillageProps(worldRoot.transform, cottage, homeSprites, pine, lanternPost, hearth, fence, spriteLitMat);
 
             // Build Hero Player
             var playerGo = BuildCharacter("HeroPlayer", new Vector3(0f, -1.6f, 0f), heroBody, heroHead, foot, heroScarf, shadow, spriteLitMat, sortBase: 20);
@@ -124,24 +156,19 @@ namespace ProjectFrontier.Editor
             playerCol.radius = 0.4f;
             var playerCtrl = playerGo.AddComponent<PlayerController2D>();
 
-            // Build NPCs (Elder Rowan & Scout Mira)
-            BuildNpc(worldRoot.transform, "Npc_ElderRowan", new Vector3(0f, 1.4f, 0f), elderBody, elderHead, foot, shadow, spriteLitMat, spriteUnlitMat, uiPanel,
-                "elder_rowan", "Elder Rowan", "Hearth Keeper",
-                new[]
-                {
-                    "Welcome to Oakhaven! Dusk falls fast across the frontier.",
-                    "Gather 5 Lantern Shards before the timer runs out—here, take my spare spark!"
-                },
-                grantsBonusShard: true);
-
-            BuildNpc(worldRoot.transform, "Npc_ScoutMira", new Vector3(5.6f, -0.5f, 0f), scoutBody, scoutHead, foot, shadow, spriteLitMat, spriteUnlitMat, uiPanel,
-                "scout_mira", "Scout Mira", "Trail Watcher",
-                new[]
-                {
-                    "The timber cottages stay crisp at 480x270 on even modest Android phones.",
-                    "Tap GFX in the corner anytime to switch Low, Medium, High, or Custom presets!"
-                },
-                grantsBonusShard: false);
+            // Build the 5-NPC vertical-slice cast at their home spots (persona cards in Assets/Data/Personas)
+            var npcRoot = new GameObject("Villagers");
+            npcRoot.transform.SetParent(worldRoot.transform, false);
+            BuildNpc(npcRoot.transform, "Npc_Bram", BramForgeSpot, castBodies[CastLook.Bram], castHeads[CastLook.Bram], foot, shadow, spriteLitMat, spriteUnlitMat,
+                NpcPersonaSeeds.Bram(), grantsBonusShard: false);
+            BuildNpc(npcRoot.transform, "Npc_Mira", MiraTavernSpot, castBodies[CastLook.Mira], castHeads[CastLook.Mira], foot, shadow, spriteLitMat, spriteUnlitMat,
+                NpcPersonaSeeds.Mira(), grantsBonusShard: true);
+            BuildNpc(npcRoot.transform, "Npc_Aldric", AldricGuildSpot, castBodies[CastLook.Aldric], castHeads[CastLook.Aldric], foot, shadow, spriteLitMat, spriteUnlitMat,
+                NpcPersonaSeeds.Aldric(), grantsBonusShard: false);
+            BuildNpc(npcRoot.transform, "Npc_Lyra", LyraSquareSpot, castBodies[CastLook.Lyra], castHeads[CastLook.Lyra], foot, shadow, spriteLitMat, spriteUnlitMat,
+                NpcPersonaSeeds.Lyra(), grantsBonusShard: false);
+            BuildNpc(npcRoot.transform, "Npc_Pip", PipStallSpot, castBodies[CastLook.Pip], castHeads[CastLook.Pip], foot, shadow, spriteLitMat, spriteUnlitMat,
+                NpcPersonaSeeds.Pip(), grantsBonusShard: false);
 
             // Build 5 Lantern Shard Pickups around the village square
             Vector3[] shardPositions =
@@ -241,7 +268,7 @@ namespace ProjectFrontier.Editor
             }
         }
 
-        private static void BuildVillageProps(Transform parent, Sprite cottage, Sprite pine, Sprite lanternPost, Sprite hearth, Sprite fence, Material mat)
+        private static void BuildVillageProps(Transform parent, Sprite cottage, HomeSpotSprites home, Sprite pine, Sprite lanternPost, Sprite hearth, Sprite fence, Material mat)
         {
             var propsRoot = new GameObject("VillageProps");
             propsRoot.transform.SetParent(parent, false);
@@ -250,11 +277,20 @@ namespace ProjectFrontier.Editor
             var hearthGo = SpawnProp(propsRoot.transform, "VillageHearth", new Vector3(0f, 0.2f, 0f), hearth, mat, sortOrder: 5, addCollider: true);
             AddPointLight2D(hearthGo.transform, new Vector3(0f, 0.25f, 0f), FrontierPalette.HearthGold, 1.35f, 4.6f);
 
-            // Cottages framing the square
-            SpawnProp(propsRoot.transform, "Cottage_West", new Vector3(-6.2f, 3.8f, 0f), cottage, mat, sortOrder: 8, addCollider: true);
-            SpawnProp(propsRoot.transform, "Cottage_East", new Vector3(6.2f, 3.8f, 0f), cottage, mat, sortOrder: 8, addCollider: true);
-            SpawnProp(propsRoot.transform, "Cottage_SouthWest", new Vector3(-6.5f, -4.2f, 0f), cottage, mat, sortOrder: 12, addCollider: true);
-            SpawnProp(propsRoot.transform, "Cottage_SouthEast", new Vector3(6.5f, -4.2f, 0f), cottage, mat, sortOrder: 12, addCollider: true);
+            // Home-spot buildings framing the square
+            SpawnProp(propsRoot.transform, "Tavern_Mira", TavernPos, home.tavern, mat, sortOrder: 8, addCollider: true);
+            SpawnProp(propsRoot.transform, "Barrel_1", TavernPos + new Vector3(-2.2f, -0.9f, 0f), home.barrel, mat, sortOrder: 9, addCollider: true);
+            SpawnProp(propsRoot.transform, "Barrel_2", TavernPos + new Vector3(-2.9f, -1.05f, 0f), home.barrel, mat, sortOrder: 9, addCollider: true);
+
+            SpawnProp(propsRoot.transform, "GuildHall_Aldric", GuildHallPos, home.guildHall, mat, sortOrder: 8, addCollider: true);
+            SpawnProp(propsRoot.transform, "QuestBoard", GuildHallPos + new Vector3(2.2f, -0.9f, 0f), home.questBoard, mat, sortOrder: 9, addCollider: true);
+
+            var forgeGo = SpawnProp(propsRoot.transform, "Forge_Bram", ForgePos, home.forge, mat, sortOrder: 12, addCollider: true);
+            AddPointLight2D(forgeGo.transform, new Vector3(-0.5f, -0.9f, 0f), FrontierPalette.EmberOrange, 0.9f, 2.4f);
+            SpawnProp(propsRoot.transform, "Anvil", BramForgeSpot + new Vector3(-0.2f, -1.2f, 0f), home.anvil, mat, sortOrder: 13, addCollider: true);
+
+            SpawnProp(propsRoot.transform, "Cottage_Pip", PipCottagePos, cottage, mat, sortOrder: 12, addCollider: true);
+            SpawnProp(propsRoot.transform, "HerbStall_Pip", HerbStallPos, home.herbStall, mat, sortOrder: 13, addCollider: true);
 
             // Lantern posts with toggleable 2D point lights (respects GraphicsSettingsManager Low/Med/High)
             Vector3[] postCoords = { new Vector3(-2.6f, 2.2f, 0f), new Vector3(2.6f, 2.2f, 0f), new Vector3(-2.6f, -2.5f, 0f), new Vector3(2.6f, -2.5f, 0f) };
@@ -342,8 +378,8 @@ namespace ProjectFrontier.Editor
             return root;
         }
 
-        private static void BuildNpc(Transform parent, string name, Vector3 pos, Sprite body, Sprite head, Sprite foot, Sprite shadow, Material litMat, Material unlitMat, Sprite uiPanel,
-            string npcId, string displayName, string role, string[] lines, bool grantsBonusShard)
+        private static void BuildNpc(Transform parent, string name, Vector3 pos, Sprite body, Sprite head, Sprite foot, Sprite shadow, Material litMat, Material unlitMat,
+            NpcPersona persona, bool grantsBonusShard)
         {
             var npcGo = BuildCharacter(name, pos, body, head, foot, null, shadow, litMat, sortBase: 18);
             npcGo.transform.SetParent(parent, true);
@@ -352,10 +388,7 @@ namespace ProjectFrontier.Editor
             var promptGo = MakeSpriteChild(npcGo.transform, "TalkPrompt", talkBubble, unlitMat, new Vector3(0f, 1.3f, 0f), 45);
 
             var npc = npcGo.AddComponent<VillageNpc>();
-            npc.NpcId = npcId;
-            npc.DisplayName = displayName;
-            npc.RoleTitle = role;
-            npc.DialogueLines = lines;
+            npc.persona = persona;
             npc.grantsBonusShardOnFirstTalk = grantsBonusShard;
             npc.promptIndicator = promptGo.transform;
         }
@@ -493,7 +526,7 @@ namespace ProjectFrontier.Editor
             SetAnchored(dlgPanel.rectTransform, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 28f), new Vector2(720f, 172f));
             shell.dialogueRoot = dlgPanel.gameObject;
 
-            shell.dialogueSpeakerText = CreateStyledTmp(dlgPanel.transform, "SpeakerName", "ELDER ROWAN", 22f, FrontierPalette.HearthGold, TextAlignmentOptions.Left);
+            shell.dialogueSpeakerText = CreateStyledTmp(dlgPanel.transform, "SpeakerName", "VILLAGER", 22f, FrontierPalette.HearthGold, TextAlignmentOptions.Left);
             SetAnchored(shell.dialogueSpeakerText.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -14f), new Vector2(-36f, 32f));
 
             shell.dialogueBodyText = CreateStyledTmp(dlgPanel.transform, "DialogueBody", "Welcome to Oakhaven!", 20f, FrontierPalette.CreamParchment, TextAlignmentOptions.TopLeft);

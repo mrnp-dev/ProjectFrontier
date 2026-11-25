@@ -1,0 +1,30 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9b851f6b7e8686c978d20b651fb192a6, type: 3}
+  m_Name: Mira
+  m_EditorClassIdentifier: Assembly-CSharp::ProjectFrontier.NpcPersona
+  npcId: mira
+  displayName: Mira
+  roleTitle: Tavern Keeper
+  homeSpot: 1
+  gameplayTieIn: Social hub and rumor broker; meals and morale buffs.
+  personality: Warm, observant gossip central. Remembers everything; what Mira believes
+    spreads through town fast.
+  speechStyle: Friendly and teasing, calls you 'love'. Slips in hints of what others
+    have said.
+  hooks:
+  - Hears every rumor first and passes it on
+  - Trusted by nearly every villager
+  - Worries Aldric stretches the Guild too thin
+  greetingLines:
+  - Welcome in, love! You look like you could use a warm bowl.
+  - Dusk is coming. Take this spare spark from my hearth and go light the square.
