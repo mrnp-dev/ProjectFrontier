@@ -9,7 +9,7 @@ Verified 2026-11-27 in the Unity Editor (`6000.3.29f1`, Play Mode) against the *
 | Converse with all 5 NPCs via free text **and** chips | ✅ 10/10 Day 1 turns live (1 chip + 1 free text per NPC), 0 offline fallbacks, 0 non-JSON |
 | Day 2+ gossip visibly changes another NPC's greeting **and** trust | ✅ Insulting Bram → Mira (T−3 A−3) and Aldric (T−2 A−2) on Day 2; greeting prefix + `VIA BRAM` toast |
 | Avg turn within ~500 in / ≤ 130 out tokens | ✅ 12 live turns: avg **406 in / 96 out**, max out 111 |
-| Sideloaded APK ≥ 30 FPS on low-end Android | ⏳ Needs a physical device (see below) |
+| Sideloaded APK ≥ 30 FPS on low-end Android | ⏭️ Deferred — no physical low-end device available; ARM64 IL2CPP APK builds cleanly (37 MiB / 38.7 MB, 0 errors), runtime & `PerfOverlay` verified in Game Mode (see below) |
 
 ## Turn log (live)
 
@@ -68,7 +68,16 @@ history was present. Fixed in this PR:
 - EditMode: **94/94** (6 new tests: retry once, no retry on 401, fallback after failed retry, error classification,
   salvage from the captured Groq body, salvage of string-encoded arguments / junk rejection).
 
-## Outstanding: on-device FPS
+## Deferred: on-device low-end Android FPS
 
-The ≥ 30 FPS gate needs the Low preset APK sideloaded on a low-end Android device. The Editor cannot stand in for
-it. Milestone 1's ARM64 IL2CPP APK baseline was 44 MB.
+Physical low-end Android hardware is not currently available, so the on-device ≥ 30 FPS measurement is deferred
+(tracked for real-hardware verification under #8 / Phase 3 exit gate #25):
+
+- **APK build verified (2026-11-27):** ARM64 IL2CPP release build (`Builds/Android/ProjectFrontier.apk`,
+  `com.frontierstudio.projectfrontier` v1.0, target SDK 36) succeeded in 1120 s with **0 errors** (1 benign
+  Diagnostics Data debug-symbols warning). Size: **38.7 MB (37 MiB)**, down from the 44 MB Milestone 1 baseline.
+- **Secrets check:** Verified 0 matches for `gsk_` across `assets/*` (release APK uses offline replies).
+- **On-device telemetry ready:** `Assets/Scripts/UI/PerfOverlay.cs` adds a hidden-by-default, zero-alloc FPS / 1%-low
+  HUD (triple-tap top-left corner to toggle) plus 10 s `[Perf]` logcat lines; verified in Unity Editor Game/Play Mode
+  and via deterministic `PerfOverlay.Low1Fps` checks.
+- **Low preset auto-select:** `GraphicsSettingsManager` automatically selects `Low` (30 FPS cap) on ≤ 3 GB RAM devices.
