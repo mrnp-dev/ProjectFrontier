@@ -79,6 +79,10 @@ namespace ProjectFrontier
         private Coroutine _endRevealRoutine;
         private float _displayedFill;
 
+        // Day clock HUD (zero-alloc): refreshed only when day/phase/10-minute step changes.
+        private readonly char[] _clockChars = new char[48];
+        private int _lastClockKey = -1;
+
         private void Start()
         {
             WireButtons();
@@ -103,6 +107,10 @@ namespace ProjectFrontier
             {
                 FrontierLiveManager.Instance.LiveStateUpdated -= RefreshEndStats;
             }
+            if (FrontierDayCycleManager.Instance != null)
+            {
+                FrontierDayCycleManager.Instance.SleepTransitionChanged -= HandleSleepTransition;
+            }
         }
 
         private void Update()
@@ -126,7 +134,54 @@ namespace ProjectFrontier
             else if (loop.State == RunState.Running)
             {
                 UpdateInteractButtonState();
+                RefreshDayClockHud(force: false);
             }
+        }
+
+        private void RefreshDayClockHud(bool force)
+        {
+            var dayMgr = FrontierDayCycleManager.Instance;
+            if (timerText == null || dayMgr == null || dayMgr.Clock == null) return;
+            var clock = dayMgr.Clock;
+            clock.GetClockTime(out int hour, out int minute10);
+            int day = clock.Day;
+            var phase = clock.CurrentPhase;
+            int key = ((day * 4 + (int)phase) * 25 + hour) * 6 + minute10 / 10;
+            if (!force && key == _lastClockKey) return;
+            _lastClockKey = key;
+
+            int n = 0;
+            n = AppendStr(_clockChars, n, "DAY ");
+            n = AppendInt(_clockChars, n, day, 1);
+            n = AppendStr(_clockChars, n, " \u00B7 ");
+            n = AppendStr(_clockChars, n, ProjectFrontier.World.DayClock.PhaseLabel(phase));
+            n = AppendStr(_clockChars, n, " ");
+            n = AppendInt(_clockChars, n, hour >= 24 ? 0 : hour, 2);
+            n = AppendStr(_clockChars, n, ":");
+            n = AppendInt(_clockChars, n, minute10, 2);
+            timerText.SetCharArray(_clockChars, 0, n);
+            timerText.color = ProjectFrontier.World.DayLightingGrading.GetHudAccentColor(phase);
+        }
+
+        private static int AppendStr(char[] buf, int n, string s)
+        {
+            for (int i = 0; i < s.Length && n < buf.Length; i++) buf[n++] = s[i];
+            return n;
+        }
+
+        private static int AppendInt(char[] buf, int n, int value, int minDigits)
+        {
+            if (value < 0) value = 0;
+            int digits = 1;
+            for (int v = value; v >= 10; v /= 10) digits++;
+            if (digits < minDigits) digits = minDigits;
+            if (n + digits > buf.Length) return n;
+            for (int i = digits - 1; i >= 0; i--)
+            {
+                buf[n + i] = (char)('0' + value % 10);
+                value /= 10;
+            }
+            return n + digits;
         }
 
         private void WireButtons()
@@ -184,6 +239,28 @@ namespace ProjectFrontier
             {
                 FrontierLiveManager.Instance.LiveStateUpdated += RefreshEndStats;
             }
+            if (FrontierDayCycleManager.Instance != null)
+            {
+                FrontierDayCycleManager.Instance.SleepTransitionChanged += HandleSleepTransition;
+            }
+        }
+
+        private void HandleSleepTransition(bool sleeping)
+        {
+            if (fadeOverlay == null) return;
+            if (_fadeTween != null) StopCoroutine(_fadeTween);
+            _fadeTween = StartCoroutine(sleeping ? PlaySleepFadeOut() : PlayTransitionFade());
+            if (!sleeping) RefreshDayClockHud(force: true);
+        }
+
+        private IEnumerator PlaySleepFadeOut()
+        {
+            fadeOverlay.gameObject.SetActive(true);
+            yield return Ease.Tween(0.30f, t =>
+            {
+                fadeOverlay.color = FrontierPalette.WithAlpha(FrontierPalette.InkDark, Mathf.Lerp(0f, 0.72f, t));
+            }, Ease.OutCubic, unscaled: true);
+            _fadeTween = null;
         }
 
         private void SyncAudioSliders()
@@ -385,6 +462,11 @@ namespace ProjectFrontier
         private void HandleTimerChanged(float remaining, float total)
         {
             if (timerText == null) return;
+            if (FrontierDayCycleManager.Instance != null)
+            {
+                RefreshDayClockHud(force: true);
+                return;
+            }
             int secs = Mathf.CeilToInt(remaining);
             int mins = secs / 60;
             int rem = secs % 60;
