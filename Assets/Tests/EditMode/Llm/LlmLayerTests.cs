@@ -311,6 +311,86 @@ namespace ProjectFrontier.Llm.Tests
         }
 
         [UnityTest]
+        public IEnumerator RetriesOnceAfterStrayToolCall()
+        {
+            var fake = new FakeProvider();
+            fake.Impl = (r, ct) => fake.Calls == 1
+                ? Task.FromException<LlmCompletion>(new LlmProviderException("HTTP 400: Tool choice is none, but model called a tool", true))
+                : Task.FromResult(new LlmCompletion { Text = "{\"dialogue\":\"Watch your tongue.\",\"mood\":\"angry\"}", PromptTokens = 410, CompletionTokens = 30 });
+            var svc = new LlmTurnService(fake, new MockLlmProvider(), 5f, () => true, _ => { });
+            LlmTurnResult res = null;
+            yield return Await(svc.RunTurnAsync(Request()), r => res = r);
+
+            Assert.AreEqual(2, fake.Calls);
+            Assert.IsFalse(res.UsedFallbackProvider);
+            Assert.AreEqual("Watch your tongue.", res.Dialogue);
+            Assert.AreEqual(1, svc.RetriedTurns);
+        }
+
+        [UnityTest]
+        public IEnumerator DoesNotRetryNonRetryableErrors()
+        {
+            var fake = new FakeProvider { Impl = (r, ct) => Task.FromException<LlmCompletion>(new LlmProviderException("HTTP 401 Unauthorized")) };
+            var svc = new LlmTurnService(fake, new MockLlmProvider(), 5f, () => true, _ => { });
+            LlmTurnResult res = null;
+            yield return Await(svc.RunTurnAsync(Request()), r => res = r);
+
+            Assert.AreEqual(1, fake.Calls);
+            Assert.IsTrue(res.UsedFallbackProvider);
+            Assert.AreEqual(0, svc.RetriedTurns);
+        }
+
+        [UnityTest]
+        public IEnumerator FallsBackWhenRetryAlsoFails()
+        {
+            var fake = new FakeProvider { Impl = (r, ct) => Task.FromException<LlmCompletion>(new LlmProviderException("HTTP 400: json_validate_failed", true)) };
+            var svc = new LlmTurnService(fake, new MockLlmProvider(), 5f, () => true, _ => { });
+            LlmTurnResult res = null;
+            yield return Await(svc.RunTurnAsync(Request("thank you")), r => res = r);
+
+            Assert.AreEqual(2, fake.Calls, "exactly one retry");
+            Assert.IsTrue(res.UsedFallbackProvider);
+            Assert.AreEqual("offline", res.ProviderName);
+        }
+
+        [Test]
+        public void SalvagesReplyFromGroqToolUseFailed()
+        {
+            // Verbatim shape of a Groq 400 for gpt-oss-20b (captured during #17 verification).
+            const string body = "{\"error\":{\"message\":\"Tool choice is none, but model called a tool\",\"type\":\"invalid_request_error\",\"code\":\"tool_use_failed\"," +
+                "\"failed_generation\":\"{\\\"name\\\": \\\"assistant<|channel|>final\\\", \\\"arguments\\\": {\\\"dialogue\\\":\\\"You dare mock my anvil? {Hmph}\\\",\\\"mood\\\":\\\"angry\\\"," +
+                "\\\"deltas\\\":{\\\"trust\\\":-2,\\\"affection\\\":-2,\\\"respect\\\":-3},\\\"quick_replies\\\":[\\\"I'll prove it.\\\",\\\"Sorry.\\\",\\\"Leave me alone.\\\"]}}\"}}";
+            string json = OpenAiCompatibleProvider.TrySalvageFailedGeneration(body);
+            Assert.IsNotNull(json);
+            LlmTurnResult r = TurnResponseParser.Parse(json, null);
+            Assert.IsTrue(r.ParsedJson);
+            Assert.AreEqual("You dare mock my anvil? {Hmph}", r.Dialogue);
+            Assert.AreEqual("angry", r.Mood);
+            Assert.AreEqual(-3, r.Deltas.respect);
+            Assert.AreEqual(3, r.QuickReplies.Length);
+        }
+
+        [Test]
+        public void SalvagesStringEncodedArgumentsAndRejectsJunk()
+        {
+            const string encoded = "{\"error\":{\"code\":\"tool_use_failed\",\"failed_generation\":\"{\\\"name\\\":\\\"x\\\",\\\"arguments\\\":\\\"{\\\\\\\"dialogue\\\\\\\":\\\\\\\"Aye.\\\\\\\"}\\\"}\"}}";
+            Assert.AreEqual("{\"dialogue\":\"Aye.\"}", OpenAiCompatibleProvider.TrySalvageFailedGeneration(encoded));
+            Assert.IsNull(OpenAiCompatibleProvider.TrySalvageFailedGeneration("{\"error\":{\"message\":\"Invalid API Key\"}}"));
+            Assert.IsNull(OpenAiCompatibleProvider.TrySalvageFailedGeneration("{\"error\":{\"failed_generation\":\"{\\\"name\\\":\\\"search\\\",\\\"arguments\\\":{\\\"q\\\":\\\"ore\\\"}}\"}}"));
+            Assert.IsNull(OpenAiCompatibleProvider.TrySalvageFailedGeneration(null));
+        }
+
+        [Test]
+        public void ClassifiesSamplingFailures()
+        {
+            Assert.IsTrue(LlmProviderException.IsSamplingFailure(400, "{\"error\":{\"message\":\"Tool choice is none, but model called a tool\",\"code\":\"tool_use_failed\"}}"));
+            Assert.IsTrue(LlmProviderException.IsSamplingFailure(400, "json_validate_failed"));
+            Assert.IsFalse(LlmProviderException.IsSamplingFailure(400, "Invalid model name"));
+            Assert.IsFalse(LlmProviderException.IsSamplingFailure(401, "called a tool"));
+            Assert.IsFalse(LlmProviderException.IsSamplingFailure(429, "rate limit"));
+        }
+
+        [UnityTest]
         public IEnumerator TimesOutAndCancelsSlowProvider()
         {
             var fake = new FakeProvider { Impl = (r, ct) => new TaskCompletionSource<LlmCompletion>().Task }; // never completes
