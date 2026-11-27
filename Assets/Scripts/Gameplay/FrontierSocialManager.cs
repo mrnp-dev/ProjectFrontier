@@ -1,7 +1,9 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
 using ProjectFrontier.Social;
+using ProjectFrontier.World;
 using UnityEngine;
 
 namespace ProjectFrontier
@@ -27,6 +29,21 @@ namespace ProjectFrontier
         public int firstMeetAffection = 1;
 
         public SocialState State { get; } = new SocialState();
+
+        /// <summary>Hidden 5x5 NPC-to-NPC trust weights used by the Gossip &amp; Bias Engine (#16).</summary>
+        public GossipTrustMatrix GossipTrust { get; } = GossipTrustMatrix.CreateDefault();
+
+        /// <summary>Raised after each evening exchange with every transfer that happened (may be empty).</summary>
+        public event Action<IReadOnlyList<GossipTransfer>> GossipExchanged;
+
+        [Header("Gossip")]
+        [Tooltip("Show a banner when evening gossip changes how someone sees the player.")]
+        public bool announceGossip = true;
+
+        private readonly List<GossipTransfer> _transfers = new List<GossipTransfer>(16);
+        private readonly Dictionary<VillageSpot, List<string>> _spotGroups = new Dictionary<VillageSpot, List<string>>();
+        private readonly List<IReadOnlyList<string>> _groupList = new List<IReadOnlyList<string>>(5);
+        private FrontierDayCycleManager _dayCycle;
         public string LastSaveStatus { get; private set; } = "Local cache";
 
         private string _localPath;
@@ -59,6 +76,8 @@ namespace ProjectFrontier
         private async void Start()
         {
             if (FrontierGameLoop.Instance != null) FrontierGameLoop.Instance.DialogueClosed += HandleDialogueClosed;
+            _dayCycle = FrontierDayCycleManager.Instance;
+            if (_dayCycle != null) _dayCycle.PhaseChanged += HandlePhaseChanged;
             await ReconcileWithCloudAsync();
         }
 
@@ -67,6 +86,7 @@ namespace ProjectFrontier
             if (Instance != this) return;
             State.RelationshipChanged -= HandleRelationshipChanged;
             if (FrontierGameLoop.Instance != null) FrontierGameLoop.Instance.DialogueClosed -= HandleDialogueClosed;
+            if (_dayCycle != null) _dayCycle.PhaseChanged -= HandlePhaseChanged;
         }
 
         private void OnApplicationPause(bool paused)
@@ -95,9 +115,67 @@ namespace ProjectFrontier
 
         public void AdvanceDay()
         {
+            // The evening exchange is part of the day: if it was skipped (sleep/debug jump), run it before rolling over.
+            if (State.LastGossipDay < State.Day) RunEveningGossip();
             State.AdvanceDay();
             _dirty = true;
             SaveNow(forceCloud: true);
+        }
+
+        // ------------------------------------------------------------------ gossip (#16)
+
+        /// <summary>Turns a notable chat outcome into a first-hand rumor held by that villager.</summary>
+        public Rumor RecordChatOutcome(string npcId, AxisDeltas applied)
+        {
+            Rumor rumor = GossipEngine.RecordChatOutcome(State, npcId, applied);
+            if (rumor != null)
+            {
+                _dirty = true;
+                Debug.Log($"[Gossip] {npcId} remembers: '{rumor.tag}' valence {rumor.valence:+0.00;-0.00} strength {rumor.strength:0.00} until day {rumor.expiresDay}");
+            }
+            return rumor;
+        }
+
+        /// <summary>Evening co-location exchange for the current day. Runs at most once per day unless forced.</summary>
+        public int RunEveningGossip(bool force = false)
+        {
+            if (!force && State.LastGossipDay >= State.Day) return 0;
+
+            NpcScheduleTable.GetCoLocatedGroups(DayPhase.Evening, _spotGroups, State.Day);
+            _groupList.Clear();
+            for (int spot = (int)VillageSpot.Forge; spot <= (int)VillageSpot.HerbGarden; spot++)
+            {
+                if (_spotGroups.TryGetValue((VillageSpot)spot, out List<string> group) && group.Count > 1) _groupList.Add(group);
+            }
+
+            _transfers.Clear();
+            int count = GossipEngine.RunExchange(State, GossipTrust, _groupList, _transfers);
+            _dirty = true;
+            SaveNow(forceCloud: false);
+
+            bool anyShift = false;
+            for (int i = 0; i < _transfers.Count; i++)
+            {
+                Debug.Log($"[Gossip] Day {State.Day}: {_transfers[i]}");
+                if (!_transfers[i].Applied.IsZero) anyShift = true;
+            }
+            if (count == 0) Debug.Log($"[Gossip] Day {State.Day}: no rumors to share this evening.");
+
+            if (announceGossip && anyShift && FeelManager.Instance != null)
+                FeelManager.Instance.PlayMilestoneMoment("WORD SPREADS", FrontierPalette.HearthGold);
+
+            GossipExchanged?.Invoke(_transfers);
+            return count;
+        }
+
+        public string GetGossipGreeting(string npcId, Func<string, string> nameOf) =>
+            GossipEngine.BuildGreetingLine(State.Rumors, npcId, State.Day, nameOf);
+
+        public Rumor GetTopHeardRumor(string npcId) => GossipEngine.TopHeardRumor(State.Rumors, npcId, State.Day);
+
+        private void HandlePhaseChanged(DayPhase previous, DayPhase next)
+        {
+            if (next == DayPhase.Evening) RunEveningGossip();
         }
 
         // ------------------------------------------------------------------ persistence

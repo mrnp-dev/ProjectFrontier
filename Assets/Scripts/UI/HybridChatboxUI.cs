@@ -145,10 +145,11 @@ namespace ProjectFrontier
             if (playerEchoText != null) playerEchoText.text = string.Empty;
             if (dialogueBodyText != null)
             {
-                dialogueBodyText.text = ChatboxHelpers.FormatGreeting(npc.DialogueLines);
+                dialogueBodyText.text = BuildGreeting(npc);
                 dialogueBodyText.color = FrontierPalette.CreamParchment;
             }
             UpdateStatusHint(usedFallback: false);
+            ShowHeardRumorToast(npc);
 
             string[] starters = npc.persona != null ? npc.persona.GetStarterQuickReplies() : TurnResponseParser.DefaultQuickReplies;
             int slotCount = quickReplyButtons != null && quickReplyButtons.Length > 0 ? quickReplyButtons.Length : ChatboxHelpers.MaxVisibleChips;
@@ -411,6 +412,39 @@ namespace ProjectFrontier
             var social = FrontierSocialManager.Instance;
             RelationshipState state = social != null ? social.Get(_activeNpc.NpcId).State : RelationshipState.Neutral;
             standingBadgeText.text = state.ToString().ToUpperInvariant();
+        }
+
+        /// <summary>Scripted greeting, opened by a 0-token gossip line when this villager heard a rumor (#16).</summary>
+        private static string BuildGreeting(VillageNpc npc)
+        {
+            string greeting = ChatboxHelpers.FormatGreeting(npc.DialogueLines);
+            var social = FrontierSocialManager.Instance;
+            string gossip = social != null ? social.GetGossipGreeting(npc.NpcId, DisplayNameOf) : null;
+            return string.IsNullOrEmpty(gossip) ? greeting : ChatboxHelpers.FormatGreeting(new[] { gossip, greeting });
+        }
+
+        /// <summary>Shows who the villager heard about you from and how it moved their view of you.</summary>
+        private void ShowHeardRumorToast(VillageNpc npc)
+        {
+            var social = FrontierSocialManager.Instance;
+            Rumor heard = social != null ? social.GetTopHeardRumor(npc.NpcId) : null;
+            if (heard == null || deltaToastText == null) return;
+            string source = DisplayNameOf(heard.sourceId).ToUpperInvariant();
+            _deltaToastBaseColor = heard.valence < 0f ? FrontierPalette.DuskAlert : FrontierPalette.HearthGold;
+            // Compact so it fits the toast slot beside the badges: "VIA BRAM · T-2 A-2".
+            string summary = string.Empty;
+            if (heard.appliedTrust != 0) summary += " T" + heard.appliedTrust.ToString("+0;-0");
+            if (heard.appliedAffection != 0) summary += " A" + heard.appliedAffection.ToString("+0;-0");
+            deltaToastText.text = summary.Length == 0 ? "VIA " + source : "VIA " + source + " ·" + summary;
+            deltaToastText.color = _deltaToastBaseColor;
+            _deltaToastTimer = 4.5f;
+        }
+
+        private static string DisplayNameOf(string npcId)
+        {
+            foreach (var other in VillageNpc.AllNpcs)
+                if (other != null && other.NpcId == npcId) return other.DisplayName;
+            return npcId;
         }
 
         private void ShowDeltaToast(AxisDeltas deltas)

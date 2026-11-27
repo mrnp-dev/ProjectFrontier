@@ -172,6 +172,8 @@ namespace ProjectFrontier
 
                 if (social != null && !result.Deltas.IsZero)
                     result.AppliedDeltas = social.ApplyDelta(npcId, result.Deltas, DeltaSource.LlmTurn).Applied;
+                if (social != null && !result.AppliedDeltas.IsZero)
+                    social.RecordChatOutcome(npcId, result.AppliedDeltas);   // notable chats become rumors (#16)
 
                 TurnCompleted?.Invoke(result);
                 return result;

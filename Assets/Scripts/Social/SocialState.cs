@@ -67,16 +67,30 @@ namespace ProjectFrontier.Social
         public bool StateChanged => Before != After;
     }
 
-    /// <summary>A belief one villager holds about the player (populated by the Gossip engine, #16).</summary>
+    /// <summary>
+    /// A belief one villager holds about the player (Gossip &amp; Bias Engine, #16).
+    /// When <c>holderId == originId</c> the villager experienced it first-hand; otherwise they heard it
+    /// from <c>sourceId</c> during an evening exchange.
+    /// </summary>
     [Serializable]
     public class Rumor
     {
         public string holderId;   // villager currently believing it
-        public string sourceId;   // villager it originated from
-        public string tag;        // e.g. "insulted_craft"
+        public string sourceId;   // villager who told the holder (== holderId for a first-hand rumor)
+        public string originId;   // villager the player actually interacted with (empty on old saves: use sourceId)
+        public string tag;        // e.g. "mocked_bram_smithing"
         public float valence;     // [-1, 1]
-        public float strength;    // [0, 1]
+        public float strength;    // [0, 1]  (for heard rumors: how strongly the holder believes it)
         public int expiresDay;
+        public int heardDay;      // day the holder learned it
+        public int appliedTrust;  // bias actually applied to the holder's Trust when heard
+        public int appliedAffection;
+
+        public string Origin => string.IsNullOrEmpty(originId) ? sourceId : originId;
+        public bool IsFirstHand => Origin == holderId;
+        public bool IsLive(int day) => expiresDay >= day;
+
+        public Rumor Clone() => (Rumor)MemberwiseClone();
     }
 
     /// <summary>
@@ -92,7 +106,17 @@ namespace ProjectFrontier.Social
         private readonly List<Rumor> _rumors = new List<Rumor>();
         private readonly HashSet<string> _met = new HashSet<string>();
 
+        /// <summary>Max rumors one villager keeps; the weakest is dropped when full.</summary>
+        public const int MaxRumorsPerHolder = 4;
+
         public int Day { get; private set; } = 1;
+
+        /// <summary>Last day an evening gossip exchange ran (prevents double exchanges after reload).</summary>
+        public int LastGossipDay { get; private set; }
+
+        public void MarkGossipRan(int day) { if (day > LastGossipDay) LastGossipDay = day; }
+
+        internal List<Rumor> RumorList => _rumors;
         public IReadOnlyList<Rumor> Rumors => _rumors;
         public IEnumerable<Relationship> All => _relationships.Values;
 
@@ -136,13 +160,46 @@ namespace ProjectFrontier.Social
             rumor.valence = Math.Clamp(rumor.valence, -1f, 1f);
             rumor.strength = Math.Clamp(rumor.strength, 0f, 1f);
             _rumors.Add(rumor);
+            EnforceHolderCap(rumor.holderId);
+        }
+
+        /// <summary>The rumor this holder keeps for (origin, tag), or null.</summary>
+        public Rumor FindRumor(string holderId, string originId, string tag)
+        {
+            for (int i = 0; i < _rumors.Count; i++)
+            {
+                Rumor r = _rumors[i];
+                if (r.holderId == holderId && r.Origin == originId && r.tag == tag) return r;
+            }
+            return null;
+        }
+
+        public int CountRumors(string holderId)
+        {
+            int n = 0;
+            for (int i = 0; i < _rumors.Count; i++) if (_rumors[i].holderId == holderId) n++;
+            return n;
+        }
+
+        private void EnforceHolderCap(string holderId)
+        {
+            while (CountRumors(holderId) > MaxRumorsPerHolder)
+            {
+                int weakest = -1;
+                for (int i = 0; i < _rumors.Count; i++)
+                {
+                    if (_rumors[i].holderId != holderId) continue;
+                    if (weakest < 0 || _rumors[i].strength < _rumors[weakest].strength) weakest = i;
+                }
+                _rumors.RemoveAt(weakest);
+            }
         }
 
         // ------------------------------------------------------------------ persistence
 
         public SocialSaveData ToSaveData(long savedAtUnixMs)
         {
-            var data = new SocialSaveData { version = CurrentSaveVersion, day = Day, savedAtUnixMs = savedAtUnixMs };
+            var data = new SocialSaveData { version = CurrentSaveVersion, day = Day, lastGossipDay = LastGossipDay, savedAtUnixMs = savedAtUnixMs };
             foreach (var rel in _relationships.Values)
             {
                 data.relationships.Add(new RelationshipRecord
@@ -151,13 +208,7 @@ namespace ProjectFrontier.Social
                 });
             }
             data.metNpcIds.AddRange(_met);
-            foreach (var r in _rumors)
-            {
-                data.rumors.Add(new Rumor
-                {
-                    holderId = r.holderId, sourceId = r.sourceId, tag = r.tag, valence = r.valence, strength = r.strength, expiresDay = r.expiresDay
-                });
-            }
+            foreach (var r in _rumors) data.rumors.Add(r.Clone());
             return data;
         }
 
@@ -168,9 +219,11 @@ namespace ProjectFrontier.Social
             _rumors.Clear();
             _met.Clear();
             Day = 1;
+            LastGossipDay = 0;
             if (data == null) return;
 
             Day = Math.Max(1, data.day);
+            LastGossipDay = Math.Clamp(data.lastGossipDay, 0, Day);
             if (data.relationships != null)
             {
                 foreach (var rec in data.relationships)
@@ -187,7 +240,7 @@ namespace ProjectFrontier.Social
             {
                 foreach (var r in data.rumors)
                 {
-                    if (r != null && r.expiresDay >= Day) AddRumor(r);
+                    if (r != null && r.expiresDay >= Day) AddRumor(r.Clone());
                 }
             }
         }
@@ -209,6 +262,7 @@ namespace ProjectFrontier.Social
     {
         public int version = SocialState.CurrentSaveVersion;
         public int day = 1;
+        public int lastGossipDay;
         public long savedAtUnixMs;
         public List<RelationshipRecord> relationships = new List<RelationshipRecord>();
         public List<string> metNpcIds = new List<string>();
