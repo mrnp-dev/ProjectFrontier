@@ -54,6 +54,8 @@ namespace ProjectFrontier.Llm
         public int PromptTokens;
         public int CompletionTokens;
         public string Model;
+        /// <summary>True when the reply was recovered from a provider error body (usage is then estimated).</summary>
+        public bool Salvaged;
     }
 
     public static class LlmMoods
@@ -100,6 +102,30 @@ namespace ProjectFrontier.Llm
 
     public class LlmProviderException : Exception
     {
-        public LlmProviderException(string message) : base(message) { }
+        /// <summary>
+        /// True when the failure came from one bad sample (e.g. the model emitted a stray tool call or invalid JSON)
+        /// rather than from config, auth, quota or the network, so trying the same request again is likely to work.
+        /// </summary>
+        public bool IsRetryable { get; }
+
+        public LlmProviderException(string message, bool isRetryable = false) : base(message) { IsRetryable = isRetryable; }
+
+        private static readonly string[] SamplingFailureMarkers =
+        {
+            "called a tool",        // Groq/OpenRouter: "Tool choice is none, but model called a tool"
+            "tool_use_failed",
+            "json_validate_failed", // json_object mode: model produced invalid JSON
+            "failed to generate json",
+            "output_parse_failed"
+        };
+
+        /// <summary>HTTP 400/422 bodies that describe a bad sample rather than a bad request.</summary>
+        public static bool IsSamplingFailure(long httpStatus, string detail)
+        {
+            if ((httpStatus != 400 && httpStatus != 422) || string.IsNullOrEmpty(detail)) return false;
+            foreach (string marker in SamplingFailureMarkers)
+                if (detail.IndexOf(marker, StringComparison.OrdinalIgnoreCase) >= 0) return true;
+            return false;
+        }
     }
 }

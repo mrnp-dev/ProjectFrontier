@@ -6,7 +6,8 @@ using System.Threading.Tasks;
 namespace ProjectFrontier.Llm
 {
     /// <summary>
-    /// Runs one structured turn: primary provider with a hard timeout, offline provider on any failure,
+    /// Runs one structured turn: primary provider with a hard timeout (one in-budget retry for a bad sample),
+    /// offline provider on any other failure,
     /// then parse + usage logging. Always returns a playable result unless the caller cancels.
     /// Continuations stay on the caller's context (no ConfigureAwait(false)) because UnityWebRequest is main-thread only.
     /// </summary>
@@ -52,7 +53,17 @@ namespace ProjectFrontier.Llm
                 {
                     try
                     {
-                        completion = await CompleteWithTimeoutAsync(Primary, request, ct);
+                        try
+                        {
+                            completion = await CompleteWithTimeoutAsync(Primary, request, TimeoutSeconds, ct);
+                        }
+                        catch (LlmProviderException e) when (e.IsRetryable && RemainingSeconds(sw) >= MinRetrySeconds)
+                        {
+                            // One bad sample (stray tool call, invalid JSON): resample once inside the same time budget.
+                            RetriedTurns++;
+                            _log?.Invoke($"[LLM] {request.NpcId}: retrying after \"{e.Message}\"");
+                            completion = await CompleteWithTimeoutAsync(Primary, request, RemainingSeconds(sw), ct);
+                        }
                         if (completion == null || string.IsNullOrWhiteSpace(completion.Text)) fallbackReason = "empty response";
                     }
                     catch (OperationCanceledException) when (ct.IsCancellationRequested)
@@ -90,17 +101,30 @@ namespace ProjectFrontier.Llm
                 ? completion.CompletionTokens
                 : TokenEstimator.Estimate(completion?.Text);
 
+            if (completion != null && completion.Salvaged) SalvagedTurns++;
+
             Usage.Record(result);
-            _log?.Invoke(FormatLog(result));
+            _log?.Invoke(FormatLog(result) + (completion != null && completion.Salvaged ? " [salvaged from tool_use_failed]" : string.Empty));
             TurnCompleted?.Invoke(result);
             return result;
         }
 
-        private async Task<LlmCompletion> CompleteWithTimeoutAsync(ILLMProvider provider, LlmRequest request, CancellationToken outer)
+        /// <summary>A retry is only attempted when at least this much of the turn budget is left.</summary>
+        public const float MinRetrySeconds = 1.5f;
+
+        /// <summary>Turns that needed a second sample from the primary provider (debug/telemetry).</summary>
+        public int RetriedTurns { get; private set; }
+
+        /// <summary>Turns whose reply was recovered from a provider error body (gpt-oss stray tool call).</summary>
+        public int SalvagedTurns { get; private set; }
+
+        private float RemainingSeconds(Stopwatch sw) => TimeoutSeconds - (float)sw.Elapsed.TotalSeconds;
+
+        private async Task<LlmCompletion> CompleteWithTimeoutAsync(ILLMProvider provider, LlmRequest request, float seconds, CancellationToken outer)
         {
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(outer);
             Task<LlmCompletion> call = provider.CompleteAsync(request, cts.Token);
-            Task timeout = Task.Delay(TimeSpan.FromSeconds(TimeoutSeconds), cts.Token);
+            Task timeout = Task.Delay(TimeSpan.FromSeconds(Math.Max(0.1f, seconds)), cts.Token);
             Task first = await Task.WhenAny(call, timeout);
             if (first != call)
             {

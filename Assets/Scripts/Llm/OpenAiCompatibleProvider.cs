@@ -43,7 +43,7 @@ namespace ProjectFrontier.Llm
 
         [Serializable] private class WireChoice { public WireMessage message; public string finish_reason; }
         [Serializable] private class WireUsage { public int prompt_tokens; public int completion_tokens; }
-        [Serializable] private class WireError { public string message; }
+        [Serializable] private class WireError { public string message; public string code; public string failed_generation; }
 
         [Serializable]
         private class WireResponse
@@ -100,8 +100,13 @@ namespace ProjectFrontier.Llm
             string payload = uwr.downloadHandler?.text;
             if (uwr.result != UnityWebRequest.Result.Success)
             {
+                string salvaged = TrySalvageFailedGeneration(payload);
+                if (salvaged != null)
+                    return new LlmCompletion { Text = salvaged, Model = _config.model, Salvaged = true };
+
                 string detail = TryReadError(payload);
-                throw new LlmProviderException($"HTTP {uwr.responseCode} {uwr.error}{(detail != null ? ": " + detail : string.Empty)}");
+                throw new LlmProviderException($"HTTP {uwr.responseCode} {uwr.error}{(detail != null ? ": " + detail : string.Empty)}",
+                    LlmProviderException.IsSamplingFailure(uwr.responseCode, payload));
             }
 
             WireResponse response;
@@ -118,6 +123,69 @@ namespace ProjectFrontier.Llm
                 CompletionTokens = response.usage?.completion_tokens ?? 0,
                 Model = string.IsNullOrEmpty(response.model) ? _config.model : response.model
             };
+        }
+
+        /// <summary>
+        /// gpt-oss on Groq sometimes wraps its final answer in a bogus tool call (name
+        /// <c>assistant&lt;|channel|&gt;final</c>), which the server rejects with <c>tool_use_failed</c> even though
+        /// <c>failed_generation</c> holds a complete reply. Returns that reply's JSON object, or null if there is
+        /// nothing usable (the caller then treats the error normally).
+        /// </summary>
+        public static string TrySalvageFailedGeneration(string errorPayload)
+        {
+            if (string.IsNullOrEmpty(errorPayload) || errorPayload.IndexOf("failed_generation", StringComparison.Ordinal) < 0) return null;
+            string generation;
+            try { generation = JsonUtility.FromJson<WireResponse>(errorPayload)?.error?.failed_generation; }
+            catch (Exception) { return null; }
+            if (string.IsNullOrEmpty(generation)) return null;
+
+            int at = generation.IndexOf("\"arguments\"", StringComparison.Ordinal);
+            string candidate = at >= 0 ? ExtractValueAfterKey(generation, at + 11) : generation;
+            if (candidate == null) return null;
+            candidate = candidate.Trim();
+            int start = candidate.IndexOf('{');
+            if (start < 0) return null;
+            string obj = MatchBraces(candidate, start);
+            return obj != null && obj.IndexOf("\"dialogue\"", StringComparison.Ordinal) >= 0 ? obj : null;
+        }
+
+        /// <summary>The raw value after <c>"key":</c> — an object as-is, or a JSON-encoded string unescaped.</summary>
+        private static string ExtractValueAfterKey(string s, int afterKey)
+        {
+            int colon = s.IndexOf(':', afterKey);
+            if (colon < 0) return null;
+            int i = colon + 1;
+            while (i < s.Length && char.IsWhiteSpace(s[i])) i++;
+            if (i >= s.Length) return null;
+            if (s[i] == '{') return MatchBraces(s, i);
+            if (s[i] != '"') return null;
+            // Arguments encoded as a JSON string: let JsonUtility unescape it.
+            int end = i + 1;
+            while (end < s.Length && !(s[end] == '"' && s[end - 1] != '\\')) end++;
+            if (end >= s.Length) return null;
+            try { return JsonUtility.FromJson<WireMessage>("{\"content\":" + s.Substring(i, end - i + 1) + "}")?.content; }
+            catch (Exception) { return null; }
+        }
+
+        /// <summary>Substring from the '{' at <paramref name="start"/> to its matching '}' (string-aware), or null.</summary>
+        private static string MatchBraces(string s, int start)
+        {
+            int depth = 0;
+            bool inString = false;
+            for (int i = start; i < s.Length; i++)
+            {
+                char c = s[i];
+                if (inString)
+                {
+                    if (c == '\\') i++;
+                    else if (c == '"') inString = false;
+                    continue;
+                }
+                if (c == '"') inString = true;
+                else if (c == '{') depth++;
+                else if (c == '}' && --depth == 0) return s.Substring(start, i - start + 1);
+            }
+            return null;
         }
 
         private static string TryReadError(string payload)
