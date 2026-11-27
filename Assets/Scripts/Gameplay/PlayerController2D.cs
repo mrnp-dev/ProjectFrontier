@@ -85,11 +85,18 @@ namespace ProjectFrontier
             var kb = Keyboard.current;
             if (kb != null)
             {
-                if (kb.escapeKey.wasPressedThisFrame && (loop.State == RunState.Running || loop.State == RunState.Paused))
+                if (kb.escapeKey.wasPressedThisFrame)
                 {
-                    loop.TogglePause();
+                    if (loop.State == RunState.Running && loop.DialogueOpen)
+                    {
+                        loop.CloseDialogue();
+                    }
+                    else if (loop.State == RunState.Running || loop.State == RunState.Paused)
+                    {
+                        loop.TogglePause();
+                    }
                 }
-                else if (loop.State == RunState.Running && (kb.eKey.wasPressedThisFrame || kb.spaceKey.wasPressedThisFrame))
+                else if (loop.State == RunState.Running && !loop.DialogueOpen && (kb.eKey.wasPressedThisFrame || kb.spaceKey.wasPressedThisFrame))
                 {
                     TryInteract();
                 }

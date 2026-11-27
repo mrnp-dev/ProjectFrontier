@@ -392,6 +392,9 @@ namespace ProjectFrontier.Editor
             var npc = npcGo.AddComponent<VillageNpc>();
             npc.persona = persona;
             npc.grantsBonusShardOnFirstTalk = grantsBonusShard;
+            npc.portraitHeadSprite = head;
+            npc.portraitBodySprite = body;
+            npc.accentColor = VillageNpc.ResolveDefaultAccent(persona != null ? persona.npcId : name);
             npc.promptIndicator = promptGo.transform;
         }
 
@@ -515,6 +518,7 @@ namespace ProjectFrontier.Editor
             joyCtrl.background = joyBg.rectTransform;
             joyCtrl.handle = joyKnob.rectTransform;
             joyCtrl.maxRadius = 46f;
+            shell.touchJoystickRoot = joyBg.gameObject;
 
             // Bottom-Right Touch Interact Button
             var talkBtn = CreateStyledButton(hudRoot.transform, "TouchInteractButton", uiPanel, "TALK", 22f, FrontierPalette.FrontierTeal, FrontierPalette.CreamParchment, out var talkLbl);
@@ -522,24 +526,8 @@ namespace ProjectFrontier.Editor
             shell.hudInteractButton = talkBtn;
             shell.hudInteractLabel = talkLbl;
 
-            // NPC Chatbox Popup
-            var dlgPanel = CreateImage(hudRoot.transform, "NpcChatbox", uiPanel, FrontierPalette.WithAlpha(FrontierPalette.SlatePanel, 0.96f), raycast: true);
-            dlgPanel.type = UnityEngine.UI.Image.Type.Sliced;
-            SetAnchored(dlgPanel.rectTransform, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 28f), new Vector2(720f, 172f));
-            shell.dialogueRoot = dlgPanel.gameObject;
-
-            shell.dialogueSpeakerText = CreateStyledTmp(dlgPanel.transform, "SpeakerName", "VILLAGER", 22f, FrontierPalette.HearthGold, TextAlignmentOptions.Left);
-            SetAnchored(shell.dialogueSpeakerText.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -14f), new Vector2(-36f, 32f));
-
-            shell.dialogueBodyText = CreateStyledTmp(dlgPanel.transform, "DialogueBody", "Welcome to Oakhaven!", 20f, FrontierPalette.CreamParchment, TextAlignmentOptions.TopLeft);
-            shell.dialogueBodyText.textWrappingMode = TextWrappingModes.Normal;
-            SetAnchored(shell.dialogueBodyText.rectTransform, new Vector2(0f, 0f), new Vector2(1f, 1f), new Vector2(0.5f, 0.5f), new Vector2(-55f, -14f), new Vector2(-150f, -64f));
-
-            var dlgNextBtn = CreateStyledButton(dlgPanel.transform, "DialogueNextButton", uiPanel, "NEXT", 20f, FrontierPalette.FrontierTeal, FrontierPalette.CreamParchment, out var dlgNextLbl);
-            SetAnchored(dlgNextBtn.GetComponent<RectTransform>(), new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(-18f, 18f), new Vector2(118f, 48f));
-            shell.dialogueNextButton = dlgNextBtn;
-            shell.dialogueNextLabel = dlgNextLbl;
-            dlgPanel.gameObject.SetActive(false);
+            // Hybrid NPC Chatbox (#14: portrait + mood + 2-3 quick-reply chips + free-text input bar)
+            BuildHybridChatbox(hudRoot.transform, shell, uiSolid, uiPanel);
 
             // 3. PAUSE & GRAPHICS/AUDIO SETTINGS SCREEN
             var pauseRoot = CreateFullRect(canvasGo.transform, "PauseScreen");
@@ -668,6 +656,221 @@ namespace ProjectFrontier.Editor
             tmp.raycastTarget = false;
             tmp.fontSharedMaterial = EnsureOutlinedTmpMaterial(tmp.font, "Assets/Art/Generated/TmpUiOutline.mat", 0.18f);
             return tmp;
+        }
+
+        private static void BuildHybridChatbox(Transform hudParent, FrontierShellUI shell, Sprite uiSolid, Sprite uiPanel)
+        {
+            var dlgPanel = CreateImage(hudParent, "NpcChatbox", uiPanel, FrontierPalette.WithAlpha(FrontierPalette.SlatePanel, 0.96f), raycast: true);
+            dlgPanel.type = UnityEngine.UI.Image.Type.Sliced;
+            SetAnchored(dlgPanel.rectTransform, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 18f), new Vector2(920f, 316f));
+            shell.dialogueRoot = dlgPanel.gameObject;
+
+            var dlgBackdrop = CreateImage(dlgPanel.transform, "ChatboxBacking", uiSolid, FrontierPalette.WithAlpha(FrontierPalette.InkDark, 0.96f), raycast: false);
+            StretchFill(dlgBackdrop.rectTransform, 4f, 4f);
+
+            var chatbox = dlgPanel.gameObject.AddComponent<HybridChatboxUI>();
+            chatbox.panelRect = dlgPanel.rectTransform;
+            chatbox.restingBottomY = 18f;
+            shell.hybridChatbox = chatbox;
+
+            // 1. Header Row (speaker name, standing pill, delta toast, mood badge, close button)
+            var headerGo = new GameObject("HeaderRow", typeof(RectTransform));
+            headerGo.transform.SetParent(dlgPanel.transform, false);
+            SetAnchored(headerGo.GetComponent<RectTransform>(), new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -12f), new Vector2(-32f, 38f));
+
+            var speakerTxt = CreateStyledTmp(headerGo.transform, "SpeakerName", "VILLAGER", 20f, FrontierPalette.HearthGold, TextAlignmentOptions.Left);
+            speakerTxt.textWrappingMode = TextWrappingModes.NoWrap;
+            speakerTxt.overflowMode = TextOverflowModes.Truncate;
+            speakerTxt.enableAutoSizing = true;
+            speakerTxt.fontSizeMin = 14f;
+            speakerTxt.fontSizeMax = 20f;
+            SetAnchored(speakerTxt.rectTransform, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(0f, 0f), new Vector2(360f, 34f));
+            chatbox.speakerNameText = speakerTxt;
+            shell.dialogueSpeakerText = speakerTxt;
+
+            var standingBg = CreateImage(headerGo.transform, "StandingBadge", uiPanel, FrontierPalette.WithAlpha(FrontierPalette.InkDark, 0.88f), raycast: false);
+            standingBg.type = UnityEngine.UI.Image.Type.Sliced;
+            SetAnchored(standingBg.rectTransform, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(368f, 0f), new Vector2(124f, 28f));
+            var standingTxt = CreateStyledTmp(standingBg.transform, "StandingLabel", "NEUTRAL", 13f, FrontierPalette.CreamParchment, TextAlignmentOptions.Center);
+            standingTxt.textWrappingMode = TextWrappingModes.NoWrap;
+            standingTxt.enableAutoSizing = true;
+            standingTxt.fontSizeMin = 10f;
+            standingTxt.fontSizeMax = 13f;
+            StretchFill(standingTxt.rectTransform, 6f, 2f);
+            chatbox.standingBadgeText = standingTxt;
+
+            var deltaTxt = CreateStyledTmp(headerGo.transform, "DeltaToast", string.Empty, 13f, FrontierPalette.HearthGold, TextAlignmentOptions.Left);
+            deltaTxt.textWrappingMode = TextWrappingModes.NoWrap;
+            deltaTxt.overflowMode = TextOverflowModes.Truncate;
+            deltaTxt.enableAutoSizing = true;
+            deltaTxt.fontSizeMin = 10f;
+            deltaTxt.fontSizeMax = 13f;
+            SetAnchored(deltaTxt.rectTransform, new Vector2(0f, 0.5f), new Vector2(1f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(162f, 0f), new Vector2(-676f, 28f));
+            chatbox.deltaToastText = deltaTxt;
+
+            var moodBg = CreateImage(headerGo.transform, "MoodBadge", uiPanel, FrontierPalette.ForgeSoot, raycast: false);
+            moodBg.type = UnityEngine.UI.Image.Type.Sliced;
+            SetAnchored(moodBg.rectTransform, new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), new Vector2(-54f, 0f), new Vector2(118f, 30f));
+            var moodTxt = CreateStyledTmp(moodBg.transform, "MoodLabel", "NEUTRAL", 13f, FrontierPalette.CreamParchment, TextAlignmentOptions.Center);
+            moodTxt.textWrappingMode = TextWrappingModes.NoWrap;
+            moodTxt.enableAutoSizing = true;
+            moodTxt.fontSizeMin = 10f;
+            moodTxt.fontSizeMax = 13f;
+            StretchFill(moodTxt.rectTransform, 6f, 2f);
+            chatbox.moodBadgeBackground = moodBg;
+            chatbox.moodBadgeText = moodTxt;
+
+            var closeBtn = CreateStyledButton(headerGo.transform, "CloseButton", uiPanel, "X", 18f, FrontierPalette.WithAlpha(FrontierPalette.DuskAlert, 0.85f), FrontierPalette.CreamParchment, out _);
+            SetAnchored(closeBtn.GetComponent<RectTransform>(), new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), Vector2.zero, new Vector2(44f, 34f));
+            chatbox.closeButton = closeBtn;
+
+            // 2. Content Row (framed pixel-art portrait + player echo + readable 1-2 sentence reply)
+            var contentGo = new GameObject("ContentRow", typeof(RectTransform));
+            contentGo.transform.SetParent(dlgPanel.transform, false);
+            SetAnchored(contentGo.GetComponent<RectTransform>(), new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -56f), new Vector2(-32f, 118f));
+
+            var portraitFrame = CreateImage(contentGo.transform, "PortraitFrame", uiPanel, FrontierPalette.HearthGold, raycast: false);
+            portraitFrame.type = UnityEngine.UI.Image.Type.Sliced;
+            SetAnchored(portraitFrame.rectTransform, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), Vector2.zero, new Vector2(104f, 108f));
+            chatbox.portraitRoot = portraitFrame.rectTransform;
+            chatbox.portraitFrameImage = portraitFrame;
+
+            var portraitBg = CreateImage(portraitFrame.transform, "PortraitBackdrop", uiSolid, FrontierPalette.InkDark, raycast: false);
+            StretchFill(portraitBg.rectTransform, 6f, 6f);
+
+            var portraitBody = CreateImage(portraitBg.transform, "PortraitBody", uiSolid, Color.white, raycast: false);
+            portraitBody.preserveAspect = true;
+            SetAnchored(portraitBody.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, -15f), new Vector2(58f, 58f));
+            chatbox.portraitBodyImage = portraitBody;
+
+            var portraitHead = CreateImage(portraitBg.transform, "PortraitHead", uiSolid, Color.white, raycast: false);
+            portraitHead.preserveAspect = true;
+            SetAnchored(portraitHead.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, 16f), new Vector2(58f, 58f));
+            chatbox.portraitHeadImage = portraitHead;
+
+            var moodBar = CreateImage(portraitFrame.transform, "PortraitMoodBar", uiSolid, FrontierPalette.ForgeSoot, raycast: false);
+            SetAnchored(moodBar.rectTransform, new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 5f), new Vector2(-12f, 7f));
+            chatbox.portraitMoodBarImage = moodBar;
+
+            var dialogueCol = new GameObject("DialogueColumn", typeof(RectTransform));
+            dialogueCol.transform.SetParent(contentGo.transform, false);
+            var colRt = dialogueCol.GetComponent<RectTransform>();
+            colRt.anchorMin = Vector2.zero;
+            colRt.anchorMax = Vector2.one;
+            colRt.offsetMin = new Vector2(118f, 0f);
+            colRt.offsetMax = Vector2.zero;
+
+            var echoTxt = CreateStyledTmp(dialogueCol.transform, "PlayerEcho", string.Empty, 13f, FrontierPalette.WithAlpha(FrontierPalette.CreamParchment, 0.72f), TextAlignmentOptions.Left);
+            echoTxt.textWrappingMode = TextWrappingModes.NoWrap;
+            echoTxt.overflowMode = TextOverflowModes.Truncate;
+            echoTxt.characterSpacing = 1.5f;
+            SetAnchored(echoTxt.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f), Vector2.zero, new Vector2(0f, 20f));
+            chatbox.playerEchoText = echoTxt;
+
+            var bodyTxt = CreateStyledTmp(dialogueCol.transform, "DialogueBody", "Welcome to Oakhaven!", 20f, FrontierPalette.CreamParchment, TextAlignmentOptions.TopLeft);
+            bodyTxt.textWrappingMode = TextWrappingModes.Normal;
+            bodyTxt.overflowMode = TextOverflowModes.Truncate;
+            bodyTxt.enableAutoSizing = true;
+            bodyTxt.fontSizeMin = 15f;
+            bodyTxt.fontSizeMax = 20f;
+            bodyTxt.characterSpacing = 1.5f;
+            bodyTxt.lineSpacing = 4f;
+            var bodyRt = bodyTxt.rectTransform;
+            bodyRt.anchorMin = Vector2.zero;
+            bodyRt.anchorMax = Vector2.one;
+            bodyRt.offsetMin = new Vector2(0f, 18f);
+            bodyRt.offsetMax = new Vector2(0f, -22f);
+            chatbox.dialogueBodyText = bodyTxt;
+            shell.dialogueBodyText = bodyTxt;
+
+            var statusTxt = CreateStyledTmp(dialogueCol.transform, "StatusHint", string.Empty, 12f, FrontierPalette.BrassBorder, TextAlignmentOptions.Right);
+            statusTxt.textWrappingMode = TextWrappingModes.NoWrap;
+            SetAnchored(statusTxt.rectTransform, new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(0.5f, 0f), Vector2.zero, new Vector2(0f, 18f));
+            chatbox.statusHintText = statusTxt;
+
+            // 3. Quick-Reply Chips Row (2-3 touch-friendly chips managed by HorizontalLayoutGroup)
+            var chipsRow = new GameObject("QuickReplyRow", typeof(RectTransform), typeof(HorizontalLayoutGroup));
+            chipsRow.transform.SetParent(dlgPanel.transform, false);
+            SetAnchored(chipsRow.GetComponent<RectTransform>(), new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 70f), new Vector2(-32f, 52f));
+            var hlg = chipsRow.GetComponent<HorizontalLayoutGroup>();
+            hlg.spacing = 10f;
+            hlg.childAlignment = TextAnchor.MiddleCenter;
+            hlg.childControlWidth = true;
+            hlg.childControlHeight = true;
+            hlg.childForceExpandWidth = true;
+            hlg.childForceExpandHeight = true;
+
+            chatbox.quickReplyButtons = new UnityEngine.UI.Button[3];
+            chatbox.quickReplyLabels = new TextMeshProUGUI[3];
+            for (int i = 0; i < 3; i++)
+            {
+                var chipBtn = CreateStyledButton(chipsRow.transform, $"QuickReplyChip_{i}", uiPanel, $"Option {i + 1}", 14f, FrontierPalette.WithAlpha(FrontierPalette.ElderIndigo, 0.92f), FrontierPalette.CreamParchment, out var chipLbl);
+                chipLbl.textWrappingMode = TextWrappingModes.Normal;
+                chipLbl.overflowMode = TextOverflowModes.Truncate;
+                chipLbl.enableAutoSizing = true;
+                chipLbl.fontSizeMin = 11f;
+                chipLbl.fontSizeMax = 14f;
+                chipLbl.characterSpacing = 1f;
+                StretchFill(chipLbl.rectTransform, 10f, 4f);
+                chatbox.quickReplyButtons[i] = chipBtn;
+                chatbox.quickReplyLabels[i] = chipLbl;
+            }
+
+            // 4. Free-Text Input Bar + Send Button
+            var inputRow = new GameObject("InputRow", typeof(RectTransform));
+            inputRow.transform.SetParent(dlgPanel.transform, false);
+            SetAnchored(inputRow.GetComponent<RectTransform>(), new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 12f), new Vector2(-32f, 48f));
+
+            var inputBg = CreateImage(inputRow.transform, "MessageInput", uiPanel, FrontierPalette.WithAlpha(FrontierPalette.InkDark, 0.96f), raycast: true);
+            inputBg.type = UnityEngine.UI.Image.Type.Sliced;
+            var inputRt = inputBg.rectTransform;
+            inputRt.anchorMin = Vector2.zero;
+            inputRt.anchorMax = Vector2.one;
+            inputRt.offsetMin = Vector2.zero;
+            inputRt.offsetMax = new Vector2(-126f, 0f);
+
+            var textArea = new GameObject("Text Area", typeof(RectTransform), typeof(RectMask2D));
+            textArea.transform.SetParent(inputBg.transform, false);
+            var textAreaRt = textArea.GetComponent<RectTransform>();
+            StretchFill(textAreaRt, 12f, 6f);
+
+            var placeholderTxt = CreateStyledTmp(textArea.transform, "Placeholder", "Say something...", 17f, FrontierPalette.WithAlpha(FrontierPalette.CreamParchment, 0.48f), TextAlignmentOptions.MidlineLeft);
+            placeholderTxt.fontStyle = FontStyles.Italic;
+            placeholderTxt.characterSpacing = 1.2f;
+            placeholderTxt.textWrappingMode = TextWrappingModes.NoWrap;
+            placeholderTxt.overflowMode = TextOverflowModes.Truncate;
+            StretchFill(placeholderTxt.rectTransform, 0f, 0f);
+
+            var inputTxt = CreateStyledTmp(textArea.transform, "Text", string.Empty, 17f, FrontierPalette.CreamParchment, TextAlignmentOptions.MidlineLeft);
+            inputTxt.fontStyle = FontStyles.Normal;
+            inputTxt.characterSpacing = 1.2f;
+            inputTxt.textWrappingMode = TextWrappingModes.NoWrap;
+            StretchFill(inputTxt.rectTransform, 0f, 0f);
+
+            var inputField = inputBg.gameObject.AddComponent<TMP_InputField>();
+            inputField.targetGraphic = inputBg;
+            inputField.textViewport = textAreaRt;
+            inputField.textComponent = inputTxt;
+            inputField.placeholder = placeholderTxt;
+            inputField.fontAsset = inputTxt.font;
+            inputField.characterLimit = ProjectFrontier.Llm.TurnPromptBuilder.MaxPlayerMessageChars;
+            inputField.lineType = TMP_InputField.LineType.SingleLine;
+            inputField.keyboardType = TouchScreenKeyboardType.Default;
+            inputField.shouldHideMobileInput = true;
+            inputField.resetOnDeActivation = false;
+            inputField.restoreOriginalTextOnEscape = false;
+            inputField.customCaretColor = true;
+            inputField.caretColor = FrontierPalette.HearthGold;
+            inputField.selectionColor = FrontierPalette.WithAlpha(FrontierPalette.FrontierTeal, 0.42f);
+            chatbox.messageInputField = inputField;
+            chatbox.inputPlaceholderText = placeholderTxt;
+
+            var sendBtn = CreateStyledButton(inputRow.transform, "SendButton", uiPanel, "SEND", 18f, FrontierPalette.FrontierTeal, FrontierPalette.CreamParchment, out var sendLbl);
+            SetAnchored(sendBtn.GetComponent<RectTransform>(), new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), Vector2.zero, new Vector2(116f, 48f));
+            chatbox.sendButton = sendBtn;
+            chatbox.sendButtonLabel = sendLbl;
+
+            dlgPanel.gameObject.SetActive(false);
         }
 
         private static UnityEngine.UI.Button CreateStyledButton(Transform parent, string name, Sprite panelSprite, string label, float fontSize, Color bgColor, Color textColor, out TextMeshProUGUI labelOut)

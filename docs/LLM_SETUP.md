@@ -19,14 +19,16 @@ default for every build until the backend proxy ships.
 ### Reasoning models (Groq `openai/gpt-oss-*`, OpenAI o-series)
 
 These models "think" before replying, and the thinking tokens count toward `max_tokens`. At their default effort the
-thinking can use the whole 130-token cap, leaving an empty reply (Groq returns `400 Failed to validate JSON`). Set:
+thinking can use the whole 130-token cap, leaving an empty reply (Groq returns `400 Failed to validate JSON`).
+`gpt-oss` models automatically default to `reasoning_effort: "low"` when `FRONTIER_LLM_REASONING_EFFORT` is unset; for
+other reasoning models (or to override), set:
 
 ```ini
 FRONTIER_LLM_REASONING_EFFORT=low
 ```
 
 This sends `reasoning_effort: "low"` and raises `max_tokens` by `reasoningTokenAllowance` (default 120, so 250 total).
-Leave it blank for normal models: they reject the field.
+Leave it blank for normal non-reasoning models: they reject the field.
 
 Tested on Groq: `openai/gpt-oss-20b` + `low` → 7/7 valid JSON turns, ~350-410 input tokens, 70-136 output tokens
 (thinking included), 0.5-0.8 s in the Editor. Free Groq tiers have per-model daily token limits; on HTTP 429 the game
@@ -107,7 +109,9 @@ Every turn logs one line:
 | `Assets/Scripts/Llm/LlmTurnService.cs` | Timeout and fallback |
 | `Assets/Scripts/Llm/LlmUsageStats.cs` | Running token averages |
 | `Assets/Scripts/Llm/LlmEndpointConfig.cs` | Settings loading (JSON, `.env`, environment variables) |
-| `Assets/Scripts/Gameplay/FrontierLlmManager.cs` | Scene manager: history, applies deltas, `SendPlayerMessageAsync` for the #14 chat UI |
+| `Assets/Scripts/Gameplay/FrontierLlmManager.cs` | Scene manager: history, applies deltas, `SendPlayerMessageAsync` for the hybrid chatbox |
+| `Assets/Scripts/UI/HybridChatboxUI.cs` | Hybrid chatbox UI: free text, 2-3 quick-reply chips, portrait, standing, mood, typing state, keyboard lift |
+| `Assets/Scripts/Llm/ChatboxHelpers.cs` | Pure-C# chatbox helpers (mood mapping, chip selection, delta formatting, typing animation, keyboard lift) |
 | `Assets/Tests/EditMode/Llm/LlmLayerTests.cs` | Edit Mode tests |
 
 ## Security

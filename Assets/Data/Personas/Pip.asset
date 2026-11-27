@@ -29,3 +29,7 @@ MonoBehaviour:
   - Oh! Hello. Careful, the moonmint bites. Only a little.
   - Lantern glow keeps the night-moths calm. Could you gather the shards? They'd
     thank you.
+  starterQuickReplies:
+  - What's moonmint good for?
+  - Any wild creatures nearby?
+  - Got any seeds or potions?

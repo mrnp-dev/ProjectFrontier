@@ -22,7 +22,51 @@ namespace ProjectFrontier
         public string[] DialogueLines => persona != null && persona.greetingLines != null && persona.greetingLines.Length > 0
             ? persona.greetingLines
             : FallbackLines;
+        [Header("Portrait (Chatbox #14)")]
+        public Sprite portraitHeadSprite;
+        public Sprite portraitBodySprite;
+        public Color accentColor = Color.clear;
+
         public Transform promptIndicator;
+
+        public Sprite PortraitHeadSprite
+        {
+            get
+            {
+                if (portraitHeadSprite == null)
+                    portraitHeadSprite = transform.Find("VisualRoot/Head")?.GetComponent<SpriteRenderer>()?.sprite;
+                return portraitHeadSprite;
+            }
+        }
+
+        public Sprite PortraitBodySprite
+        {
+            get
+            {
+                if (portraitBodySprite == null)
+                    portraitBodySprite = transform.Find("VisualRoot/Body")?.GetComponent<SpriteRenderer>()?.sprite;
+                return portraitBodySprite;
+            }
+        }
+
+        public Color AccentColor
+        {
+            get
+            {
+                if (accentColor.a > 0.01f) return accentColor;
+                return ResolveDefaultAccent(NpcId);
+            }
+        }
+
+        public static Color ResolveDefaultAccent(string npcId) => (npcId ?? string.Empty).ToLowerInvariant() switch
+        {
+            "bram" => FrontierPalette.EmberOrange,
+            "mira" => FrontierPalette.TavernWine,
+            "aldric" => FrontierPalette.GuildNavy,
+            "lyra" => FrontierPalette.RivalViolet,
+            "pip" => FrontierPalette.HerbOlive,
+            _ => FrontierPalette.HearthGold
+        };
 
         private bool _grantedBonus;
         private Vector3 _promptBasePos;

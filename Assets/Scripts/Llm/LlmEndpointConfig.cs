@@ -95,8 +95,14 @@ namespace ProjectFrontier.Llm
             cfg.model = Pick(EnvModel, dotEnv) ?? cfg.model;
             cfg.apiKey = Pick(EnvApiKey, dotEnv) ?? cfg.apiKey;
             cfg.reasoningEffort = Pick(EnvReasoningEffort, dotEnv) ?? cfg.reasoningEffort;
+            if (!cfg.HasReasoningEffort && IsDefaultReasoningModel(cfg.model))
+                cfg.reasoningEffort = "low";
             return cfg;
         }
+
+        public static bool IsDefaultReasoningModel(string modelName) =>
+            !string.IsNullOrWhiteSpace(modelName) &&
+            modelName.IndexOf("gpt-oss", StringComparison.OrdinalIgnoreCase) >= 0;
 
         private static string Pick(string name, Dictionary<string, string> dotEnv)
         {

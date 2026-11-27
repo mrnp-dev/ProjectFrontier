@@ -27,3 +27,7 @@ MonoBehaviour:
   greetingLines:
   - Recruit. The Guild ledger has no name for you yet.
   - Earn one. Gather the lantern shards before dark. Reliably.
+  starterQuickReplies:
+  - Any bounties on the board?
+  - How do I earn a rank?
+  - Are we expecting a raid?

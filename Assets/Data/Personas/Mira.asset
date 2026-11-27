@@ -28,3 +28,7 @@ MonoBehaviour:
   greetingLines:
   - Welcome in, love! You look like you could use a warm bowl.
   - Dusk is coming. Take this spare spark from my hearth and go light the square.
+  starterQuickReplies:
+  - What's the latest gossip?
+  - Tell me about the villagers.
+  - Thanks for the warm welcome!

@@ -27,3 +27,7 @@ MonoBehaviour:
   greetingLines:
   - Hmph. Another newcomer. Mind the sparks.
   - Lanterns dying already? Fetch the shards. Iron and fire wait for no one.
+  starterQuickReplies:
+  - Nice forge you've got here.
+  - Need rare dungeon ore?
+  - Who else should I meet?

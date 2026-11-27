@@ -35,8 +35,10 @@ namespace ProjectFrontier
         public UnityEngine.UI.Button hudPauseButton;
         public UnityEngine.UI.Button hudInteractButton;
         public TextMeshProUGUI hudInteractLabel;
+        public GameObject touchJoystickRoot;
 
         [Header("Dialogue Chatbox")]
+        public HybridChatboxUI hybridChatbox;
         public TextMeshProUGUI dialogueSpeakerText;
         public TextMeshProUGUI dialogueBodyText;
         public UnityEngine.UI.Button dialogueNextButton;
@@ -307,7 +309,11 @@ namespace ProjectFrontier
             if (hudRoot != null) hudRoot.SetActive(state == RunState.Running);
             if (pauseRoot != null) pauseRoot.SetActive(state == RunState.Paused);
             if (endRoot != null) endRoot.SetActive(isEndState && !deferEndReveal);
-            if (dialogueRoot != null && state != RunState.Running) dialogueRoot.SetActive(false);
+            if (state != RunState.Running)
+            {
+                if (hybridChatbox != null) hybridChatbox.Close();
+                else if (dialogueRoot != null) dialogueRoot.SetActive(false);
+            }
             if (state == RunState.Ready || state == RunState.Paused) FeelManager.Instance?.HideTransientOverlays();
 
             if (deferEndReveal)
@@ -388,6 +394,13 @@ namespace ProjectFrontier
 
         private void HandleDialogueUpdated(VillageNpc npc, int lineIndex)
         {
+            if (touchJoystickRoot != null) touchJoystickRoot.SetActive(false);
+            if (hybridChatbox != null)
+            {
+                hybridChatbox.OpenForNpc(npc);
+                return;
+            }
+
             if (dialogueRoot != null) dialogueRoot.SetActive(true);
             if (dialogueSpeakerText != null) dialogueSpeakerText.text = $"{npc.DisplayName.ToUpperInvariant()} · {npc.RoleTitle}";
             if (dialogueBodyText != null && lineIndex >= 0 && lineIndex < npc.DialogueLines.Length)
@@ -402,15 +415,22 @@ namespace ProjectFrontier
 
         private void HandleDialogueClosed()
         {
-            if (dialogueRoot != null) dialogueRoot.SetActive(false);
+            if (hybridChatbox != null) hybridChatbox.Close();
+            else if (dialogueRoot != null) dialogueRoot.SetActive(false);
+            var loop = FrontierGameLoop.Instance;
+            if (touchJoystickRoot != null && loop != null && loop.State == RunState.Running)
+                touchJoystickRoot.SetActive(true);
         }
 
         private void UpdateInteractButtonState()
         {
-            if (hudInteractButton == null) return;
             var player = PlayerController2D.Instance;
             var loop = FrontierGameLoop.Instance;
             bool dlgOpen = loop != null && loop.DialogueOpen;
+            if (touchJoystickRoot != null && touchJoystickRoot.activeSelf == dlgOpen)
+                touchJoystickRoot.SetActive(!dlgOpen);
+
+            if (hudInteractButton == null) return;
             bool nearNpc = player != null && player.NearestNpc != null;
             bool showBtn = !dlgOpen && nearNpc;
             if (hudInteractButton.gameObject.activeSelf != showBtn)

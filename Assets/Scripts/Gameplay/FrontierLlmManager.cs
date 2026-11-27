@@ -164,7 +164,7 @@ namespace ProjectFrontier
                 });
                 request.Temperature = Config.temperature;
 
-                LlmTurnResult result = await Service.RunTurnAsync(request, null, _lifetime.Token);
+                LlmTurnResult result = await Service.RunTurnAsync(request, persona.GetStarterQuickReplies(), _lifetime.Token);
                 if (this == null) return null;
 
                 Remember(npcId, new ChatMessage(ChatRole.User, message));
