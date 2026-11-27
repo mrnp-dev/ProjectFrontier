@@ -38,6 +38,23 @@ namespace ProjectFrontier
         [Header("Scripted Greeting (Layer 0, 0 tokens)")]
         [TextArea(1, 3)] public string[] greetingLines = new string[0];
 
+        [Header("Starter Quick Replies (Before First LLM Turn)")]
+        public string[] starterQuickReplies = new string[0];
+
+        private static readonly string[] DefaultStarterReplies =
+        {
+            "Tell me about yourself.",
+            "Any news around Oakhaven?",
+            "Need any help?"
+        };
+
+        public string[] GetStarterQuickReplies()
+        {
+            if (starterQuickReplies != null && starterQuickReplies.Length >= 2)
+                return starterQuickReplies;
+            return DefaultStarterReplies;
+        }
+
         /// <summary>
         /// Compact single-block persona text for the LLM system prompt. Called once per conversation open,
         /// never per frame, so the StringBuilder allocation is acceptable.

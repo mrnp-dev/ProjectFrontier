@@ -451,5 +451,114 @@ namespace ProjectFrontier.Llm.Tests
             cfg.jsonMode = false;
             StringAssert.DoesNotContain("response_format", new OpenAiCompatibleProvider(cfg, null).BuildBody(req));
         }
+
+        [Test]
+        public void LoadDefaultsReasoningEffortLowForGptOssModels()
+        {
+            string dir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "frontier_llm_oss_" + Guid.NewGuid().ToString("N"));
+            System.IO.Directory.CreateDirectory(dir);
+            try
+            {
+                string dotEnv = System.IO.Path.Combine(dir, ".env");
+                System.IO.File.WriteAllText(dotEnv, "FRONTIER_LLM_MODE=DirectDev\nFRONTIER_LLM_MODEL=openai/gpt-oss-20b\n");
+                var cfg = LlmEndpointConfig.Load(null, dotEnv);
+                if (Environment.GetEnvironmentVariable(LlmEndpointConfig.EnvModel) == null &&
+                    Environment.GetEnvironmentVariable(LlmEndpointConfig.EnvReasoningEffort) == null)
+                {
+                    Assert.AreEqual("low", cfg.reasoningEffort);
+                    Assert.AreEqual(250, cfg.EffectiveMaxTokens(TurnPromptBuilder.DefaultMaxOutputTokens));
+                }
+            }
+            finally
+            {
+                System.IO.Directory.Delete(dir, true);
+            }
+        }
+    }
+
+    public class ChatboxHelpersTests
+    {
+        [Test]
+        public void MapsEveryKnownMoodAndFallsBackToNeutral()
+        {
+            foreach (string mood in LlmMoods.All)
+            {
+                var mv = ChatboxHelpers.GetMoodVisual(mood);
+                Assert.AreEqual(mood, mv.MoodKey);
+                Assert.AreEqual(mood.ToUpperInvariant(), mv.Label);
+                Assert.IsTrue(ColorUtility.TryParseHtmlString(mv.BadgeHex, out _), $"Invalid badge hex for {mood}");
+                Assert.IsTrue(ColorUtility.TryParseHtmlString(mv.TextHex, out _), $"Invalid text hex for {mood}");
+            }
+
+            var unknown = ChatboxHelpers.GetMoodVisual("ecstatic");
+            Assert.AreEqual(LlmMoods.Neutral, unknown.MoodKey);
+            Assert.AreEqual("NEUTRAL", unknown.Label);
+        }
+
+        [Test]
+        public void FormatsGreetingCompactly()
+        {
+            string joined = ChatboxHelpers.FormatGreeting(new[] { "Hmph. Mind the sparks.", "Fetch the shards." });
+            Assert.AreEqual("Hmph. Mind the sparks. Fetch the shards.", joined);
+            Assert.AreEqual(TurnResponseParser.SilentLine, ChatboxHelpers.FormatGreeting(null));
+            Assert.AreEqual(TurnResponseParser.SilentLine, ChatboxHelpers.FormatGreeting(new[] { "   " }));
+        }
+
+        [Test]
+        public void SelectChipsGuaranteesTwoToThreeUniqueChips()
+        {
+            string[] fallback = { "Ask about forge", "Ask about town", "Say goodbye" };
+
+            string[] single = ChatboxHelpers.SelectChips(new[] { "Only one" }, fallback, 3);
+            Assert.GreaterOrEqual(single.Length, 2);
+            Assert.LessOrEqual(single.Length, 3);
+            Assert.AreEqual("Only one", single[0]);
+
+            string[] two = ChatboxHelpers.SelectChips(new[] { "First", "Second" }, fallback, 3);
+            Assert.AreEqual(2, two.Length);
+
+            string[] deduped = ChatboxHelpers.SelectChips(new[] { "Hi", "hi", "Hi" }, fallback, 3);
+            Assert.GreaterOrEqual(deduped.Length, 2);
+            Assert.AreNotEqual(deduped[0].ToLowerInvariant(), deduped[1].ToLowerInvariant());
+        }
+
+        [Test]
+        public void TypingIndicatorCyclesOneToThreeDots()
+        {
+            Assert.AreEqual("Bram is thinking.", ChatboxHelpers.FormatTypingIndicator("Bram", 0.0f));
+            Assert.AreEqual("Bram is thinking..", ChatboxHelpers.FormatTypingIndicator("Bram", 0.4f));
+            Assert.AreEqual("Bram is thinking...", ChatboxHelpers.FormatTypingIndicator("Bram", 0.8f));
+            Assert.AreEqual("Bram is thinking.", ChatboxHelpers.FormatTypingIndicator("Bram", 1.1f));
+        }
+
+        [Test]
+        public void FormatsPlayerEchoAndDeltaSummary()
+        {
+            Assert.AreEqual("YOU: \"Nice forge!\"", ChatboxHelpers.FormatPlayerEcho("  Nice   forge! "));
+            Assert.AreEqual(string.Empty, ChatboxHelpers.FormatPlayerEcho("   "));
+            string longEcho = ChatboxHelpers.FormatPlayerEcho(new string('a', 120), 32);
+            StringAssert.EndsWith("...\"", longEcho);
+
+            Assert.AreEqual("+2 TRUST · -1 RESPECT", ChatboxHelpers.FormatDeltaSummary(new AxisDeltas(2, 0, -1)));
+            Assert.AreEqual(string.Empty, ChatboxHelpers.FormatDeltaSummary(default));
+        }
+
+        [Test]
+        public void MobileKeyboardLiftConvertsPixelsAndClampsInsideViewport()
+        {
+            // Hidden keyboard stays at resting bottom margin
+            Assert.AreEqual(18f, ChatboxHelpers.ComputeKeyboardLiftY(18f, 316f, 720f, 400f, 1.5f, false));
+
+            // 450px keyboard at 1.5x canvas scale = 300 canvas units -> lifted to 310 (fits under 720 - 316 - 16 = 388)
+            Assert.AreEqual(310f, ChatboxHelpers.ComputeKeyboardLiftY(18f, 316f, 720f, 450f, 1.5f, true), 0.01f);
+
+            // Huge keyboard clamps cleanly inside top viewport margin instead of pushing chatbox off-screen
+            Assert.AreEqual(388f, ChatboxHelpers.ComputeKeyboardLiftY(18f, 316f, 720f, 1200f, 1.5f, true), 0.01f);
+
+            // Android sometimes reports area.height == 0 while visible -> uses safe fallback fraction
+            float fallbackLift = ChatboxHelpers.ComputeKeyboardLiftY(18f, 316f, 720f, 0f, 1.5f, true);
+            Assert.Greater(fallbackLift, 200f);
+            Assert.LessOrEqual(fallbackLift, 388f);
+        }
     }
 }

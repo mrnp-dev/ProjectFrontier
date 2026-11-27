@@ -21,11 +21,11 @@ namespace ProjectFrontier.Llm
         public int MaxOutputTokens = DefaultMaxOutputTokens;
 
         public const string OutputRules =
-            "Stay in character. Reply in 1-2 short sentences.\n" +
+            "Stay strictly in character; use your speech style and never sound like an AI assistant. Reply in 1-2 short sentences (max 25 words).\n" +
             "Respond ONLY with compact JSON: {\"dialogue\":\"...\",\"mood\":\"happy|neutral|annoyed|angry|sad|shy|flirty|suspicious|proud|amused\"," +
             "\"deltas\":{\"trust\":0,\"affection\":0,\"respect\":0},\"quick_replies\":[\"...\",\"...\",\"...\"]}\n" +
-            "deltas are integers -5..5: how the player's last line changed your feelings. " +
-            "quick_replies: 3 short things the player might say next (max 8 words each).";
+            "deltas: integers -5..5 reflecting how the player's line made you feel (use +/-1..3 for praise, warmth, help, or insults). " +
+            "quick_replies: 3 distinct short lines the player might say next (max 7 words each).";
 
         public sealed class Context
         {

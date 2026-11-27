@@ -33,6 +33,7 @@ namespace ProjectFrontier
         public float RunDurationSeconds { get => runDurationSeconds; set => runDurationSeconds = Mathf.Max(5f, value); }
         public int NpcsMetCount => _metNpcIds.Count;
         public bool DialogueOpen { get; private set; }
+        public VillageNpc ActiveNpc => _activeNpc;
 
         public event Action<RunState> StateChanged;
         public event Action<int, int> ProgressChanged;
@@ -92,7 +93,7 @@ namespace ProjectFrontier
             CollectedLanterns = 0;
             TimeRemaining = runDurationSeconds;
             _metNpcIds.Clear();
-            CloseDialogue();
+            CloseDialogue(completeInteraction: false);
             SetState(RunState.Running);
             ProgressChanged?.Invoke(CollectedLanterns, goalLanterns);
             TimerChanged?.Invoke(TimeRemaining, runDurationSeconds);
@@ -162,9 +163,7 @@ namespace ProjectFrontier
             _dialogueLineIndex++;
             if (_dialogueLineIndex >= _activeNpc.DialogueLines.Length)
             {
-                VillageNpc finishedNpc = _activeNpc;
                 CloseDialogue();
-                finishedNpc.OnDialogueCompleted(this);
             }
             else
             {
@@ -172,19 +171,25 @@ namespace ProjectFrontier
             }
         }
 
-        public void CloseDialogue()
+        public void CloseDialogue(bool completeInteraction = true)
         {
             if (!DialogueOpen && _activeNpc == null) return;
+            VillageNpc finishedNpc = _activeNpc;
+            bool shouldComplete = completeInteraction && State == RunState.Running;
             DialogueOpen = false;
             _activeNpc = null;
             _dialogueLineIndex = 0;
             DialogueClosed?.Invoke();
+            if (shouldComplete && finishedNpc != null)
+            {
+                finishedNpc.OnDialogueCompleted(this);
+            }
         }
 
         public void Win()
         {
             if (State != RunState.Running) return;
-            CloseDialogue();
+            CloseDialogue(completeInteraction: false);
             SetState(RunState.Won);
             SynthAudioManager.Instance?.PlayMilestone();
             FeelManager.Instance?.PlayMilestoneMoment("VILLAGE LIT!", FrontierPalette.HearthGold);
@@ -193,7 +198,7 @@ namespace ProjectFrontier
         public void Lose()
         {
             if (State != RunState.Running) return;
-            CloseDialogue();
+            CloseDialogue(completeInteraction: false);
             SetState(RunState.Lost);
             SynthAudioManager.Instance?.PlayLose();
             FeelManager.Instance?.PlayMilestoneMoment("DUSK FELL", FrontierPalette.DuskAlert);

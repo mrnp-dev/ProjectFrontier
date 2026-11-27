@@ -34,6 +34,12 @@ namespace ProjectFrontier.Editor
                 "Hmph. Another newcomer. Mind the sparks.",
                 "Lanterns dying already? Fetch the shards. Iron and fire wait for no one."
             };
+            p.starterQuickReplies = new[]
+            {
+                "Nice forge you've got here.",
+                "Need rare dungeon ore?",
+                "Who else should I meet?"
+            };
         });
 
         public static NpcPersona Mira() => Ensure("Mira", p =>
@@ -55,6 +61,12 @@ namespace ProjectFrontier.Editor
             {
                 "Welcome in, love! You look like you could use a warm bowl.",
                 "Dusk is coming. Take this spare spark from my hearth and go light the square."
+            };
+            p.starterQuickReplies = new[]
+            {
+                "What's the latest gossip?",
+                "Tell me about the villagers.",
+                "Thanks for the warm welcome!"
             };
         });
 
@@ -78,6 +90,12 @@ namespace ProjectFrontier.Editor
                 "Recruit. The Guild ledger has no name for you yet.",
                 "Earn one. Gather the lantern shards before dark. Reliably."
             };
+            p.starterQuickReplies = new[]
+            {
+                "Any bounties on the board?",
+                "How do I earn a rank?",
+                "Are we expecting a raid?"
+            };
         });
 
         public static NpcPersona Lyra() => Ensure("Lyra", p =>
@@ -99,6 +117,12 @@ namespace ProjectFrontier.Editor
             {
                 "Oh look, the new hero. Cute.",
                 "Bet I could light this whole square before you find a single shard."
+            };
+            p.starterQuickReplies = new[]
+            {
+                "You're on — name the stakes!",
+                "Where do you usually hunt?",
+                "What do you think of Bram?"
             };
         });
 
@@ -122,6 +146,12 @@ namespace ProjectFrontier.Editor
                 "Oh! Hello. Careful, the moonmint bites. Only a little.",
                 "Lantern glow keeps the night-moths calm. Could you gather the shards? They'd thank you."
             };
+            p.starterQuickReplies = new[]
+            {
+                "What's moonmint good for?",
+                "Any wild creatures nearby?",
+                "Got any seeds or potions?"
+            };
         });
 
         private static NpcPersona Ensure(string assetName, System.Action<NpcPersona> seed)
@@ -129,7 +159,19 @@ namespace ProjectFrontier.Editor
             Directory.CreateDirectory(PersonaDir);
             string path = $"{PersonaDir}/{assetName}.asset";
             var existing = AssetDatabase.LoadAssetAtPath<NpcPersona>(path);
-            if (existing != null) return existing;
+            if (existing != null)
+            {
+                if (existing.starterQuickReplies == null || existing.starterQuickReplies.Length == 0)
+                {
+                    var defaults = ScriptableObject.CreateInstance<NpcPersona>();
+                    seed(defaults);
+                    existing.starterQuickReplies = defaults.starterQuickReplies;
+                    Object.DestroyImmediate(defaults);
+                    EditorUtility.SetDirty(existing);
+                    AssetDatabase.SaveAssets();
+                }
+                return existing;
+            }
 
             var persona = ScriptableObject.CreateInstance<NpcPersona>();
             seed(persona);

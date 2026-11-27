@@ -27,3 +27,7 @@ MonoBehaviour:
   greetingLines:
   - Oh look, the new hero. Cute.
   - Bet I could light this whole square before you find a single shard.
+  starterQuickReplies:
+  - "You're on \u2014 name the stakes!"
+  - Where do you usually hunt?
+  - What do you think of Bram?
