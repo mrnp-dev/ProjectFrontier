@@ -199,7 +199,7 @@ namespace ProjectFrontier.Llm.Tests
                 new Rumor { holderId = "mira", sourceId = "aldric", tag = "other", valence = -1f, strength = 1f, expiresDay = 9 }
             };
             string line = TurnPromptBuilder.BuildRumorLine(rumors, "bram", 3, id => id == "pip" ? "Pip" : id);
-            Assert.AreEqual("RUMOR: Pip says the player saved a cat (you half-believe it).", line);
+            Assert.AreEqual("RUMOR: Pip says the player saved a cat (you mostly believe Pip).", line);
             Assert.IsNull(TurnPromptBuilder.BuildRumorLine(rumors, "lyra", 3, null));
         }
     }

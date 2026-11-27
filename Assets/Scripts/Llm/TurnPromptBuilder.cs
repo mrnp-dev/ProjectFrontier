@@ -109,26 +109,10 @@ namespace ProjectFrontier.Llm
         }
 
         /// <summary>
-        /// Picks the strongest live rumor this villager holds and renders the one-line prompt hint, e.g.
-        /// "RUMOR: Bram says the player insulted his craft (you half-believe it)." Returns null when there is none.
+        /// Picks the strongest live rumor this villager <b>heard</b> from someone else and renders the one-line prompt hint
+        /// (GDD §6), e.g. "RUMOR: Bram says the player mocked his smithing (you mostly believe Bram)." Null when there is none.
         /// </summary>
-        public static string BuildRumorLine(IReadOnlyList<Rumor> rumors, string holderId, int day, Func<string, string> nameOf)
-        {
-            if (rumors == null || string.IsNullOrEmpty(holderId)) return null;
-            Rumor best = null;
-            float bestScore = 0f;
-            foreach (var r in rumors)
-            {
-                if (r == null || r.holderId != holderId || r.expiresDay < day) continue;
-                float score = Math.Abs(r.valence) * r.strength;
-                if (best == null || score > bestScore) { best = r; bestScore = score; }
-            }
-            if (best == null) return null;
-
-            string source = nameOf?.Invoke(best.sourceId) ?? best.sourceId;
-            string summary = string.IsNullOrEmpty(best.tag) ? "something about the player" : "the player " + best.tag.Replace('_', ' ');
-            string belief = best.strength >= 0.7f ? "you believe it" : best.strength >= 0.35f ? "you half-believe it" : "you doubt it";
-            return $"RUMOR: {source} says {summary} ({belief}).";
-        }
+        public static string BuildRumorLine(IReadOnlyList<Rumor> rumors, string holderId, int day, Func<string, string> nameOf) =>
+            GossipEngine.BuildPromptLine(rumors, holderId, day, nameOf);
     }
 }
