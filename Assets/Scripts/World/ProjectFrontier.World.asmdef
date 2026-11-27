@@ -1,0 +1,14 @@
+{
+    "name": "ProjectFrontier.World",
+    "rootNamespace": "ProjectFrontier.World",
+    "references": [],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

@@ -68,6 +68,10 @@ namespace ProjectFrontier
             _ => FrontierPalette.HearthGold
         };
 
+        private NpcScheduleAgent _scheduleAgent;
+        public NpcScheduleAgent ScheduleAgent => _scheduleAgent != null ? _scheduleAgent : (_scheduleAgent = GetComponent<NpcScheduleAgent>());
+        public ProjectFrontier.World.VillageSpot CurrentSpot => ScheduleAgent != null ? ScheduleAgent.CurrentSpot : ProjectFrontier.World.VillageSpot.Square;
+
         private bool _grantedBonus;
         private Vector3 _promptBasePos;
 
@@ -89,6 +93,7 @@ namespace ProjectFrontier
 
         private void Awake()
         {
+            _scheduleAgent = GetComponent<NpcScheduleAgent>();
             if (promptIndicator != null)
             {
                 _promptBasePos = promptIndicator.localPosition;

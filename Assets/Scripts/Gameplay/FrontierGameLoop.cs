@@ -25,6 +25,7 @@ namespace ProjectFrontier
         [Header("Tunable Loop Parameters")]
         [SerializeField] private int goalLanterns = 5;
         [SerializeField] private float runDurationSeconds = 90f;
+        [SerializeField] private bool enableDuskLoseTimer = false;
 
         public RunState State { get; private set; } = RunState.Ready;
         public int CollectedLanterns { get; private set; }
@@ -76,7 +77,8 @@ namespace ProjectFrontier
         private void Update()
         {
             if (State != RunState.Running) return;
-            if (DialogueOpen) return; // Pause dusk timer kindly while reading NPC dialogue
+            if (DialogueOpen) return; // Pause timer kindly while reading NPC dialogue
+            if (!enableDuskLoseTimer || FrontierDayCycleManager.Instance != null) return;
 
             TimeRemaining = Mathf.Max(0f, TimeRemaining - Time.deltaTime);
             TimerChanged?.Invoke(TimeRemaining, runDurationSeconds);

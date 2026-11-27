@@ -133,6 +133,7 @@ namespace ProjectFrontier.Editor
             var liveMgr = managersGo.AddComponent<FrontierLiveManager>();
             managersGo.AddComponent<FrontierSocialManager>();
             managersGo.AddComponent<FrontierLlmManager>();
+            managersGo.AddComponent<FrontierDayCycleManager>();
             var impulseSrc = managersGo.AddComponent<CinemachineImpulseSource>();
             feelMgr.impulseSource = impulseSrc;
 
@@ -396,6 +397,7 @@ namespace ProjectFrontier.Editor
             npc.portraitBodySprite = body;
             npc.accentColor = VillageNpc.ResolveDefaultAccent(persona != null ? persona.npcId : name);
             npc.promptIndicator = promptGo.transform;
+            npcGo.AddComponent<NpcScheduleAgent>();
         }
 
         private static void BuildLanternShard(Transform parent, string name, Vector3 pos, Sprite sprite, Sprite shadow, Material unlitMat)
@@ -496,8 +498,10 @@ namespace ProjectFrontier.Editor
             StretchFill(barFill.rectTransform, 2f, 2f);
             shell.progressFillImage = barFill;
 
-            shell.timerText = CreateStyledTmp(goalCard.transform, "TimerText", "DUSK 01:30", 18f, FrontierPalette.CreamParchment, TextAlignmentOptions.Left);
-            SetAnchored(shell.timerText.rectTransform, new Vector2(0f, 0f), new Vector2(0.6f, 0f), new Vector2(0f, 0f), new Vector2(14f, 10f), new Vector2(220f, 28f));
+            shell.timerText = CreateStyledTmp(goalCard.transform, "TimerText", "DAY 1 \u00B7 MORNING 06:00", 18f, FrontierPalette.CreamParchment, TextAlignmentOptions.Left);
+            shell.timerText.textWrappingMode = TextWrappingModes.NoWrap;
+            shell.timerText.enableAutoSizing = false;
+            SetAnchored(shell.timerText.rectTransform, new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(0f, 0f), new Vector2(14f, 10f), new Vector2(-28f, 28f));
 
             // Top-Right Controls (GFX Badge + Pause)
             var gfxBtn = CreateStyledButton(hudRoot.transform, "HudGfxButton", uiPanel, "GFX: LOW", 18f, FrontierPalette.SlatePanel, FrontierPalette.HearthGold, out var gfxLbl);
