@@ -61,4 +61,28 @@ public static class PlayerSave
             return fallback;
         }
     }
+
+    // Like LoadAsync, but tells "no save yet" (ok, found = false) apart from
+    // "could not ask" (ok = false: not signed in or the load failed), so a
+    // caller can avoid overwriting cloud data it never actually read.
+    public static async Task<(bool ok, bool found, T value)> TryLoadAsync<T>(string key)
+    {
+        try
+        {
+            if (!await PlayerAuthentication.SignedIn)
+            {
+                return (false, false, default);
+            }
+            var items = await CloudSaveService.Instance.Data.Player.LoadAsync(
+                new HashSet<string> { key });
+            return items.TryGetValue(key, out Item item)
+                ? (true, true, item.Value.GetAs<T>())
+                : (true, false, default);
+        }
+        catch (Exception e)
+        {
+            Debug.LogWarning($"Cloud Save load failed: {e.Message}");
+            return (false, false, default);
+        }
+    }
 }

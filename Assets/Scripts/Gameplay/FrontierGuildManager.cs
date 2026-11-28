@@ -29,7 +29,9 @@ namespace ProjectFrontier
         public GuildState State { get; private set; }
         public string LastSaveStatus { get; private set; } = "Local cache";
         public string LastFlavorSource { get; private set; } = "STATIC";
-        public bool IsFetchingFlavor { get; private set; }
+        public bool IsFetchingFlavor => _flavorFetches > 0;
+        public bool IsCloudReconciled => _reconciled;
+        public bool HasPendingCloudSave => _cloudPending;
 
         public int CurrentDay => FrontierDayCycleManager.Instance != null
             ? FrontierDayCycleManager.Instance.CurrentDay
@@ -47,6 +49,14 @@ namespace ProjectFrontier
         private long _localSavedAt;
         private float _lastCloudSaveTime = -999f;
         private bool _cloudSaveInFlight;
+        private bool _cloudPending;            // a cloud write is owed (failed, skipped, or requested mid-flight)
+        private bool _reconciled;              // cloud writes are blocked until the cloud copy has been read
+        private bool _reconcileInFlight;
+        private bool _actedBeforeReconcile;    // player progress made before reconcile finished
+        private long _startupLocalSavedAt;     // timestamp of the local save we booted from
+        private float _lastReconcileAttempt = -999f;
+        private int _flavorFetches;
+        private readonly HashSet<string> _flavorFailed = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private int _lastSeenLanterns;
         private CancellationTokenSource _lifetime;
         private readonly HashSet<string> _flavorInFlight = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -71,6 +81,7 @@ namespace ProjectFrontier
             {
                 State.LoadFrom(local, CurrentDay);
                 _localSavedAt = local.savedAtUnixMs;
+                _startupLocalSavedAt = local.savedAtUnixMs;
             }
             State.Changed += HandleStateChanged;
             State.RankChanged += HandleRankChanged;
@@ -106,9 +117,23 @@ namespace ProjectFrontier
             }
 
             State.RefreshBoardForDay(CurrentDay);
-            await ReconcileWithCloudAsync();
-            if (this == null) return;
             _ = RefreshBoardFlavorAsync();
+            await ReconcileWithCloudAsync();
+        }
+
+        private void Update()
+        {
+            // Cheap bool checks; retries a failed/skipped cloud write or an unfinished reconcile on the interval.
+            if (!_cloudPending && _reconciled) return;
+            float now = Time.realtimeSinceStartup;
+            if (!_reconciled)
+            {
+                if (!_reconcileInFlight && now - _lastReconcileAttempt >= cloudSaveIntervalSeconds)
+                    _ = ReconcileWithCloudAsync();
+                return;
+            }
+            if (!_cloudSaveInFlight && now - _lastCloudSaveTime >= cloudSaveIntervalSeconds)
+                _ = PumpCloudSavesAsync();
         }
 
         private void OnDestroy()
@@ -156,7 +181,7 @@ namespace ProjectFrontier
             bool ok = State.TryAccept(bountyId, CurrentDay, out message);
             if (ok)
             {
-                _dirty = true;
+                MarkPlayerProgress();
                 SynthAudioManager.Instance?.PlayUiClick();
                 SaveNow(forceCloud: false);
             }
@@ -181,7 +206,7 @@ namespace ProjectFrontier
             bool ok = State.TryTurnIn(bountyId, inv, social, out result);
             if (ok)
             {
-                _dirty = true;
+                MarkPlayerProgress();
                 SynthAudioManager.Instance?.PlayPickup();
                 if (PlayerController2D.Instance != null)
                 {
@@ -222,7 +247,7 @@ namespace ProjectFrontier
             bool ok = State.TryAbandon(bountyId, social, out message);
             if (ok)
             {
-                _dirty = true;
+                MarkPlayerProgress();
                 SynthAudioManager.Instance?.PlayUiClick();
                 FrontierSocialManager.Instance?.SaveNow(forceCloud: false);
                 SaveNow(forceCloud: false);
@@ -240,7 +265,7 @@ namespace ProjectFrontier
             int updated = State.RecordProgress(kind, targetId, delta);
             if (updated > 0)
             {
-                _dirty = true;
+                MarkPlayerProgress();
                 SaveNow(forceCloud: false);
             }
             return updated;
@@ -257,7 +282,8 @@ namespace ProjectFrontier
             if (State == null) return;
             State.ResetToStarter(CurrentDay);
             LastFlavorSource = "STATIC";
-            _dirty = true;
+            _flavorFailed.Clear();
+            MarkPlayerProgress();
             SaveNow(forceCloud: false);
         }
 
@@ -283,7 +309,7 @@ namespace ProjectFrontier
             }
 
             string townHint = BuildTownContextHint();
-            IsFetchingFlavor = true;
+            _flavorFetches++;
             try
             {
                 for (int i = 0; i < boardSnapshot.Count; i++)
@@ -295,6 +321,7 @@ namespace ProjectFrontier
                     if (def == null) continue;
 
                     string key = State.MakeFlavorKey(day, bountyId);
+                    if (_flavorFailed.Contains(key)) continue;   // fell back once today: keep static, don't re-ask
                     if (!_flavorInFlight.Add(key)) continue;
                     try
                     {
@@ -307,9 +334,9 @@ namespace ProjectFrontier
                             _dirty = true;
                             FlavorUpdated?.Invoke();
                         }
-                        else if (LastFlavorSource == "STATIC")
+                        else
                         {
-                            LastFlavorSource = "STATIC";
+                            _flavorFailed.Add(key);
                         }
                     }
                     catch (OperationCanceledException)
@@ -325,7 +352,7 @@ namespace ProjectFrontier
             }
             finally
             {
-                IsFetchingFlavor = false;
+                _flavorFetches = Math.Max(0, _flavorFetches - 1);
             }
         }
 
@@ -361,6 +388,7 @@ namespace ProjectFrontier
         {
             if (State == null) return;
             State.RefreshBoardForDay(newDay);
+            _flavorFailed.Clear();
             _dirty = true;
             SaveNow(forceCloud: false);
             _ = RefreshBoardFlavorAsync();
@@ -398,6 +426,17 @@ namespace ProjectFrontier
 
         // ------------------------------------------------------------------ persistence
 
+        private void MarkPlayerProgress()
+        {
+            _dirty = true;
+            if (!_reconciled) _actedBeforeReconcile = true;
+        }
+
+        /// <summary>
+        /// Writes the local file synchronously (source of truth) and, when due, queues a cloud write.
+        /// Cloud writes never block the main thread and are never dropped: failures and requests made
+        /// while a write is in flight leave <see cref="_cloudPending"/> set and are retried.
+        /// </summary>
         public void SaveNow(bool forceCloud)
         {
             if (State == null || string.IsNullOrEmpty(_localPath)) return;
@@ -406,19 +445,50 @@ namespace ProjectFrontier
             _localSavedAt = snapshot.savedAtUnixMs;
             _dirty = false;
 
-            bool due = forceCloud || Time.realtimeSinceStartup - _lastCloudSaveTime >= cloudSaveIntervalSeconds;
-            if (due) _ = SaveCloudAsync(snapshot);
+            bool due = forceCloud || _cloudPending || Time.realtimeSinceStartup - _lastCloudSaveTime >= cloudSaveIntervalSeconds;
+            if (!due) return;
+            _cloudPending = true;
+            if (_reconciled && !_cloudSaveInFlight) _ = PumpCloudSavesAsync();
+            // Not reconciled yet: stays pending; reconcile pushes it once the cloud copy has been read.
         }
 
-        private async Task SaveCloudAsync(GuildSaveData snapshot)
+        private async Task PumpCloudSavesAsync()
         {
-            if (_cloudSaveInFlight || !LiveOpsAllowsWrites()) return;
+            if (_cloudSaveInFlight || !_reconciled) return;
             _cloudSaveInFlight = true;
-            _lastCloudSaveTime = Time.realtimeSinceStartup;
             try
             {
-                bool ok = await PlayerSave.SaveAsync(CloudKey, snapshot);
-                LastSaveStatus = ok ? "Cloud synced" : "Local cache";
+                // Loop so a save requested mid-flight (e.g. pause/quit) runs as a trailing write.
+                while (_cloudPending && this != null && State != null)
+                {
+                    if (!LiveOpsAllowsWrites()) break;   // stays pending
+                    _cloudPending = false;
+                    _lastCloudSaveTime = Time.realtimeSinceStartup;
+                    GuildSaveData snapshot = State.ToSaveData(_localSavedAt);
+                    bool ok;
+                    try
+                    {
+                        ok = await PlayerSave.SaveAsync(CloudKey, snapshot);
+                    }
+                    catch (Exception e)
+                    {
+                        Debug.LogWarning($"[Guild] Cloud save threw: {e.Message}");
+                        ok = false;
+                    }
+                    if (this == null) return;
+                    if (!ok)
+                    {
+                        _cloudPending = true;
+                        LastSaveStatus = "Local cache (cloud retry pending)";
+                        break;
+                    }
+                    LastSaveStatus = "Cloud synced";
+                }
+            }
+            catch (Exception e)
+            {
+                _cloudPending = true;
+                Debug.LogWarning($"[Guild] Cloud save loop failed: {e.Message}");
             }
             finally
             {
@@ -426,18 +496,56 @@ namespace ProjectFrontier
             }
         }
 
+        /// <summary>
+        /// Reads the cloud copy (awaiting sign-in) and applies <see cref="GuildCloudSync.Decide"/>.
+        /// Cloud writes stay blocked until this succeeds, so starter state can never overwrite cloud progress.
+        /// </summary>
         private async Task ReconcileWithCloudAsync()
         {
-            if (!LiveOpsAllowsWrites()) return;
-            GuildSaveData cloud = await PlayerSave.LoadAsync<GuildSaveData>(CloudKey, null);
-            if (this == null) return;
-
-            if (cloud != null && !_dirty && cloud.savedAtUnixMs > _localSavedAt)
+            if (_reconciled || _reconcileInFlight) return;
+            if (FrontierLiveManager.Instance != null && !FrontierLiveManager.Instance.LiveOpsEnabled) return;
+            _reconcileInFlight = true;
+            _lastReconcileAttempt = Time.realtimeSinceStartup;
+            try
             {
-                State.LoadFrom(cloud, CurrentDay);
-                WriteLocal(cloud);
-                _localSavedAt = cloud.savedAtUnixMs;
-                LastSaveStatus = "Cloud loaded";
+                var (ok, found, cloud) = await PlayerSave.TryLoadAsync<GuildSaveData>(CloudKey);
+                if (this == null || State == null) return;
+                bool hasCloud = found && cloud != null;
+
+                GuildReconcileAction action = GuildCloudSync.Decide(
+                    ok, hasCloud, hasCloud ? cloud.savedAtUnixMs : 0, _startupLocalSavedAt, _actedBeforeReconcile);
+
+                switch (action)
+                {
+                    case GuildReconcileAction.Retry:
+                        return;   // _lastReconcileAttempt throttles the Update retry
+                    case GuildReconcileAction.AdoptCloud:
+                        State.LoadFrom(cloud, CurrentDay);
+                        WriteLocal(cloud);
+                        _localSavedAt = cloud.savedAtUnixMs;
+                        _dirty = false;
+                        _cloudPending = false;
+                        LastSaveStatus = "Cloud loaded";
+                        _flavorFailed.Clear();
+                        _ = RefreshBoardFlavorAsync();
+                        break;
+                    case GuildReconcileAction.PushLocal:
+                        _cloudPending = true;
+                        break;
+                    case GuildReconcileAction.InSync:
+                        break;
+                }
+
+                _reconciled = true;
+                if (_cloudPending) _ = PumpCloudSavesAsync();
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning($"[Guild] Cloud reconcile failed: {e.Message}");
+            }
+            finally
+            {
+                _reconcileInFlight = false;
             }
         }
 
@@ -472,6 +580,6 @@ namespace ProjectFrontier
         }
 
         private static bool LiveOpsAllowsWrites() =>
-            FrontierLiveManager.IsSignedInNow() && (FrontierLiveManager.Instance == null || FrontierLiveManager.Instance.LiveOpsEnabled);
+            FrontierLiveManager.Instance == null || FrontierLiveManager.Instance.LiveOpsEnabled;
     }
 }
