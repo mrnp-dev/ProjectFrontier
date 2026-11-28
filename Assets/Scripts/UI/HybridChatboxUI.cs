@@ -215,6 +215,8 @@ namespace ProjectFrontier
         public void SubmitPlayerMessage(string rawText)
         {
             if (!IsOpen || IsWaitingForReply || _activeNpc == null) return;
+            // Online-only (#37/#48): while "Reconnecting..." holds the game, hardware Enter/Send must not start a turn.
+            if (FrontierGameLoop.Instance != null && FrontierGameLoop.Instance.ConnectionHold) return;
             if (string.IsNullOrWhiteSpace(rawText)) return;
             string trimmed = rawText.Trim();
             if (trimmed.Length == 0) return;
