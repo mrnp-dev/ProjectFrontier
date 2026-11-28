@@ -21,10 +21,18 @@ MonoBehaviour:
     rewards kindness quietly.
   speechStyle: Soft and rambling, with plant and animal asides. Talks to the herbs
     mid-sentence.
+  knowledge:
+  - "you sell moonmint, sunpetal and emberroot seeds, potions and recipes at your Herb Garden stall; you keep tameable beasts"
+  - "Moonmint Salve heals, Sunpetal Tea quickens, Ember Tonic strengthens"
+  - "likes honey-nettle soup, rain on leaves; hates anyone who hurts a beast"
+  opinions:
+  - "Bram loud, mended your fence for free"
+  - "Mira saves you soup"
+  - "Aldric's soldiers scare the beasts"
+  - "Lyra secretly feeds strays"
   hooks:
-  - Supplies seeds, potions, and taming treats
-  - Remembers anyone who harms a beast
-  - Shy around Aldric's soldiers
+  - "Remembers anyone who harms a beast"
+  - "Rewards kindness quietly"
   greetingLines:
   - Oh! Hello. Careful, the moonmint bites. Only a little.
   - Lantern glow keeps the night-moths calm. Could you gather the shards? They'd

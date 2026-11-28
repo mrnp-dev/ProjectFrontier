@@ -32,7 +32,7 @@ namespace ProjectFrontier.Llm
         public string NpcDisplayName;
         public readonly List<ChatMessage> Messages = new List<ChatMessage>();
         public int MaxTokens = TurnPromptBuilder.DefaultMaxOutputTokens;
-        public float Temperature = 0.8f;
+        public float Temperature = 0.85f;
         public int EstimatedInputTokens;
 
         /// <summary>The player's line for this turn (last user message), used by the offline provider.</summary>

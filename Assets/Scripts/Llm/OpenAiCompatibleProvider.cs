@@ -64,14 +64,24 @@ namespace ProjectFrontier.Llm
             for (int i = 0; i < request.Messages.Count; i++)
                 body.messages[i] = new WireMessage { role = request.Messages[i].RoleName, content = request.Messages[i].Content };
             string json = JsonUtility.ToJson(body);
+            // JsonUtility can't omit fields, so optional ones are appended by hand (only when set).
+            if (_config.frequencyPenalty > 0f) json = AppendField(json, "frequency_penalty", FormatFloat(Clamp(_config.frequencyPenalty, 0f, 2f)));
+            if (_config.presencePenalty > 0f) json = AppendField(json, "presence_penalty", FormatFloat(Clamp(_config.presencePenalty, 0f, 2f)));
             if (_config.HasReasoningEffort)
             {
-                // JsonUtility can't omit fields, so append the optional one by hand. Wrapping in a wire object escapes it.
+                // Wrapping in a wire object escapes the value.
                 string effort = JsonUtility.ToJson(new WireFormat { type = _config.reasoningEffort.Trim() });
-                json = json.Substring(0, json.Length - 1) + ",\"reasoning_effort\":" + effort.Substring(8, effort.Length - 9) + "}";
+                json = AppendField(json, "reasoning_effort", effort.Substring(8, effort.Length - 9));
             }
             return json;
         }
+
+        private static string AppendField(string json, string name, string rawValue) =>
+            json.Substring(0, json.Length - 1) + ",\"" + name + "\":" + rawValue + "}";
+
+        private static float Clamp(float v, float min, float max) => v < min ? min : v > max ? max : v;
+
+        private static string FormatFloat(float v) => v.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture);
 
         public async Task<LlmCompletion> CompleteAsync(LlmRequest request, CancellationToken ct)
         {
