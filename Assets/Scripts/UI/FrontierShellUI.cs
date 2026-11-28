@@ -82,6 +82,7 @@ namespace ProjectFrontier
         // Day clock HUD (zero-alloc): refreshed only when day/phase/10-minute step changes.
         private readonly char[] _clockChars = new char[48];
         private int _lastClockKey = -1;
+        private string _lastInteractLabel;
 
         private void Start()
         {
@@ -390,6 +391,7 @@ namespace ProjectFrontier
             {
                 if (hybridChatbox != null) hybridChatbox.Close();
                 else if (dialogueRoot != null) dialogueRoot.SetActive(false);
+                FrontierFarmUI.Instance?.Close();
             }
             if (state == RunState.Ready || state == RunState.Paused) FeelManager.Instance?.HideTransientOverlays();
 
@@ -508,25 +510,54 @@ namespace ProjectFrontier
         {
             var player = PlayerController2D.Instance;
             var loop = FrontierGameLoop.Instance;
-            bool dlgOpen = loop != null && loop.DialogueOpen;
-            if (touchJoystickRoot != null && touchJoystickRoot.activeSelf == dlgOpen)
-                touchJoystickRoot.SetActive(!dlgOpen);
+            bool modalBlocking = (loop != null && loop.DialogueOpen) || FrontierFarmUI.IsAnyModalOpen;
+            if (touchJoystickRoot != null && touchJoystickRoot.activeSelf == modalBlocking)
+                touchJoystickRoot.SetActive(!modalBlocking);
 
             if (hudInteractButton == null) return;
             bool nearNpc = player != null && player.NearestNpc != null;
-            bool showBtn = !dlgOpen && nearNpc;
+            bool nearStation = !nearNpc && player != null && player.NearestStation != null;
+            bool nearPlot = !nearNpc && !nearStation && player != null && player.HasTargetPlot;
+            bool showBtn = !modalBlocking && (nearNpc || nearStation || nearPlot);
+
             if (hudInteractButton.gameObject.activeSelf != showBtn)
             {
                 hudInteractButton.gameObject.SetActive(showBtn);
             }
             hudInteractButton.interactable = showBtn;
+            if (!showBtn) return;
+
+            string label;
+            Color accent;
+            if (nearNpc)
+            {
+                label = "TALK";
+                accent = FrontierPalette.FrontierTeal;
+            }
+            else if (nearStation)
+            {
+                label = player.NearestStation.GetDefaultLabel();
+                accent = player.NearestStation.GetButtonAccentColor();
+            }
+            else
+            {
+                var action = FrontierFarmManager.Instance != null
+                    ? FrontierFarmManager.Instance.PeekPlotAction(player.TargetPlotX, player.TargetPlotY)
+                    : ProjectFrontier.Farm.PlotActionKind.None;
+                label = FrontierFarmManager.GetPlotActionLabel(action);
+                accent = action == ProjectFrontier.Farm.PlotActionKind.Harvest
+                    ? FrontierPalette.HearthGold
+                    : (action == ProjectFrontier.Farm.PlotActionKind.NeedSeeds ? FrontierPalette.Terracotta : FrontierPalette.HerbOlive);
+            }
+
             if (hudInteractButton.targetGraphic != null)
             {
-                hudInteractButton.targetGraphic.color = FrontierPalette.FrontierTeal;
+                hudInteractButton.targetGraphic.color = accent;
             }
-            if (hudInteractLabel != null)
+            if (hudInteractLabel != null && _lastInteractLabel != label)
             {
-                hudInteractLabel.text = "TALK";
+                _lastInteractLabel = label;
+                hudInteractLabel.text = label;
             }
         }
 

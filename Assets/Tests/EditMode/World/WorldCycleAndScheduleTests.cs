@@ -286,5 +286,17 @@ namespace ProjectFrontier.World.Tests
             Assert.AreEqual(1, calls);
             Assert.Less(Vector2.Distance(buf[buf.Count - 1], new Vector2(-5f, 2f)), 0.01f);
         }
+
+        [Test]
+        public void NavGrid_MarkBlockedRect_IgnoresOutOfBoundsRects()
+        {
+            var grid = NavGrid2D.CreateOakhavenDefault();
+            // West Homestead colliders lie west of Origin.x (-13) and must not clamp onto border column 0.
+            grid.MarkBlockedRect(-22f, -4f, -15f, 4f, padding: 0.25f);
+            for (int cy = 0; cy < grid.Height; cy++)
+            {
+                Assert.IsTrue(grid.IsWalkable(0, cy), $"Border cell (0,{cy}) was wrongly blocked by out-of-bounds rect");
+            }
+        }
     }
 }

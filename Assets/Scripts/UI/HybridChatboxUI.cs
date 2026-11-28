@@ -28,6 +28,7 @@ namespace ProjectFrontier
         public TextMeshProUGUI deltaToastText;
         public Image moodBadgeBackground;
         public TextMeshProUGUI moodBadgeText;
+        public Button shopButton;
         public Button closeButton;
 
         [Header("Portrait")]
@@ -88,6 +89,9 @@ namespace ProjectFrontier
             if (closeButton != null)
                 closeButton.onClick.AddListener(HandleCloseClicked);
 
+            if (shopButton != null)
+                shopButton.onClick.AddListener(HandleShopClicked);
+
             if (sendButton != null)
                 sendButton.onClick.AddListener(HandleSendClicked);
 
@@ -137,6 +141,8 @@ namespace ProjectFrontier
                 speakerNameText.text = npc.DisplayName.ToUpperInvariant() + role;
             }
             RefreshStandingBadge();
+            if (shopButton != null)
+                shopButton.gameObject.SetActive(string.Equals(npc.NpcId, "pip", StringComparison.OrdinalIgnoreCase));
             if (deltaToastText != null) deltaToastText.text = string.Empty;
 
             ApplyPortrait(npc);
@@ -538,6 +544,18 @@ namespace ProjectFrontier
         private void HandleInputSubmitted(string submittedText)
         {
             SubmitPlayerMessage(submittedText);
+        }
+
+        private void HandleShopClicked()
+        {
+            if (FrontierFarmUI.Instance != null)
+            {
+                FrontierFarmUI.Instance.Open(FarmModalTab.PipShop);
+            }
+            else
+            {
+                HandleCloseClicked();
+            }
         }
 
         private void HandleCloseClicked()

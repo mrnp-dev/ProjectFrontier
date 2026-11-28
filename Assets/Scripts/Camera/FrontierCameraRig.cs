@@ -20,7 +20,7 @@ namespace ProjectFrontier
         public float titlePanRadiusY = 0.8f;
 
         [Header("Gameplay Bounds")]
-        public Vector2 clampMin = new Vector2(-4.2f, -2.2f);
+        public Vector2 clampMin = new Vector2(-16.0f, -2.2f);
         public Vector2 clampMax = new Vector2(4.2f, 2.2f);
 
         private float _panTime;

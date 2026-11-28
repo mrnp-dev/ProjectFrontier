@@ -111,7 +111,7 @@ namespace ProjectFrontier
             var loop = FrontierGameLoop.Instance;
             if (loop != null && loop.State != RunState.Running) return;
 
-            bool blockedByDialogue = pauseDuringDialogue && loop != null && loop.DialogueOpen;
+            bool blockedByDialogue = pauseDuringDialogue && ((loop != null && loop.DialogueOpen) || FrontierFarmUI.IsAnyModalOpen);
             if (!blockedByDialogue && !IsSleeping)
             {
                 _clock.Tick(Time.deltaTime);

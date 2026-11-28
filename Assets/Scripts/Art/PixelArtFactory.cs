@@ -597,6 +597,192 @@ namespace ProjectFrontier
             });
         }
 
+        // ---------------------------------------------------------------------------------
+        // Homestead & Farming sprites (#19): 16-PPU soil tiles, crop stages, bench, rest post
+        // ---------------------------------------------------------------------------------
+
+        public static Sprite GetSoilTileSprite(int soilState)
+        {
+            string key = soilState switch
+            {
+                1 => "tile_soil_tilled",
+                2 => "tile_soil_watered",
+                _ => "tile_soil_untilled"
+            };
+            return GetOrBuild(key, 16, 16, (w, h, px) =>
+            {
+                if (soilState == 0)
+                {
+                    // Framed meadow plot pad ready to till
+                    Color border = Color.Lerp(FrontierPalette.MeadowMoss, FrontierPalette.TimberDark, 0.35f);
+                    Color body = Color.Lerp(FrontierPalette.MeadowMoss, FrontierPalette.DirtEdge, 0.28f);
+                    FillRect(px, w, h, 0, 0, w, h, border);
+                    FillRect(px, w, h, 1, 1, w - 2, h - 2, body);
+                    SetPx(px, w, h, 3, 4, FrontierPalette.MeadowLight);
+                    SetPx(px, w, h, 11, 10, FrontierPalette.MeadowLight);
+                    SetPx(px, w, h, 7, 12, FrontierPalette.DirtPath);
+                }
+                else
+                {
+                    bool watered = soilState == 2;
+                    Color edge = watered ? FrontierPalette.InkDark : FrontierPalette.TimberDark;
+                    Color ridge = watered ? Color.Lerp(FrontierPalette.TimberDark, FrontierPalette.InkDark, 0.45f) : FrontierPalette.TimberWarm;
+                    Color furrow = watered ? Color.Lerp(FrontierPalette.InkDark, FrontierPalette.FrontierTeal, 0.16f) : FrontierPalette.TimberDark;
+                    FillRect(px, w, h, 0, 0, w, h, edge);
+                    FillRect(px, w, h, 1, 1, w - 2, h - 2, ridge);
+                    for (int y = 3; y <= 12; y += 3)
+                    {
+                        FillRect(px, w, h, 2, y, 12, 1, furrow);
+                    }
+                    if (watered)
+                    {
+                        // Subtle damp glint pixels
+                        SetPx(px, w, h, 4, 5, Color.Lerp(FrontierPalette.FrontierTeal, FrontierPalette.CreamParchment, 0.35f));
+                        SetPx(px, w, h, 11, 11, Color.Lerp(FrontierPalette.FrontierTeal, FrontierPalette.CreamParchment, 0.35f));
+                    }
+                    else
+                    {
+                        SetPx(px, w, h, 4, 8, FrontierPalette.DirtPath);
+                        SetPx(px, w, h, 11, 5, FrontierPalette.DirtEdge);
+                    }
+                }
+            });
+        }
+
+        public static Sprite GetCropStageSprite(int stage)
+        {
+            return GetOrBuild("crop_stage_" + stage, 16, 16, (w, h, px) =>
+            {
+                if (stage <= 1)
+                {
+                    // Seedling: tiny twin shoot
+                    FillRect(px, w, h, 7, 3, 2, 3, FrontierPalette.MeadowLight);
+                    FillRect(px, w, h, 5, 5, 2, 2, FrontierPalette.HerbOlive);
+                    FillRect(px, w, h, 9, 5, 2, 2, FrontierPalette.MeadowLight);
+                }
+                else if (stage == 2)
+                {
+                    // Sprout: leafy rosette
+                    FillRect(px, w, h, 6, 3, 4, 5, FrontierPalette.MeadowMoss);
+                    FillRect(px, w, h, 4, 6, 3, 3, FrontierPalette.MeadowLight);
+                    FillRect(px, w, h, 9, 6, 3, 3, FrontierPalette.HerbOlive);
+                    FillRect(px, w, h, 7, 8, 2, 2, FrontierPalette.MeadowLight);
+                }
+                else
+                {
+                    // Growing: full leafy bush with small bud
+                    FillRect(px, w, h, 5, 3, 6, 6, FrontierPalette.DeepPine);
+                    FillRect(px, w, h, 3, 5, 10, 5, FrontierPalette.MeadowMoss);
+                    FillRect(px, w, h, 5, 8, 6, 4, FrontierPalette.MeadowLight);
+                    FillRect(px, w, h, 7, 11, 2, 2, FrontierPalette.CreamParchment);
+                }
+                ApplyOutline(px, w, h, FrontierPalette.InkDark);
+            });
+        }
+
+        public static Sprite GetMatureCropSprite(string cropId)
+        {
+            string id = string.IsNullOrEmpty(cropId) ? "moonmint" : cropId.ToLowerInvariant();
+            return GetOrBuild("crop_mature_" + id, 16, 16, (w, h, px) =>
+            {
+                // Lush foliage base
+                FillRect(px, w, h, 4, 3, 8, 5, FrontierPalette.DeepPine);
+                FillRect(px, w, h, 3, 5, 10, 5, FrontierPalette.MeadowMoss);
+                if (id == "sunpetal")
+                {
+                    // Golden sunlit blossom
+                    FillRect(px, w, h, 5, 8, 6, 6, FrontierPalette.HearthGold);
+                    FillRect(px, w, h, 4, 9, 8, 4, FrontierPalette.HearthGold);
+                    FillRect(px, w, h, 6, 10, 4, 2, FrontierPalette.EmberOrange);
+                    SetPx(px, w, h, 7, 12, FrontierPalette.CreamParchment);
+                    SetPx(px, w, h, 8, 12, FrontierPalette.CreamParchment);
+                }
+                else if (id == "emberroot")
+                {
+                    // Glowing ember bulb & crimson-gold leaves
+                    FillRect(px, w, h, 5, 4, 6, 5, FrontierPalette.Terracotta);
+                    FillRect(px, w, h, 6, 5, 4, 4, FrontierPalette.EmberOrange);
+                    FillRect(px, w, h, 7, 6, 2, 2, FrontierPalette.HearthGold);
+                    FillRect(px, w, h, 4, 9, 3, 4, FrontierPalette.HerbOlive);
+                    FillRect(px, w, h, 9, 9, 3, 4, FrontierPalette.MeadowLight);
+                    SetPx(px, w, h, 7, 11, FrontierPalette.HearthGold);
+                }
+                else
+                {
+                    // Moonmint: shimmering silver-teal herb leaves
+                    FillRect(px, w, h, 4, 7, 8, 5, FrontierPalette.FrontierTeal);
+                    FillRect(px, w, h, 6, 9, 4, 5, FrontierPalette.FrontierTeal);
+                    SetPx(px, w, h, 5, 10, FrontierPalette.CreamParchment);
+                    SetPx(px, w, h, 7, 12, FrontierPalette.CreamParchment);
+                    SetPx(px, w, h, 10, 9, FrontierPalette.CreamParchment);
+                }
+                ApplyOutline(px, w, h, FrontierPalette.InkDark);
+            });
+        }
+
+        public static Sprite GetPlotCursorSprite()
+        {
+            return GetOrBuild("ui_plot_cursor", 16, 16, (w, h, px) =>
+            {
+                Color hi = FrontierPalette.HearthGold;
+                Color dark = FrontierPalette.InkDark;
+                // Four crisp corner brackets
+                FillRect(px, w, h, 0, 0, 5, 2, dark); FillRect(px, w, h, 0, 0, 2, 5, dark);
+                FillRect(px, w, h, 11, 0, 5, 2, dark); FillRect(px, w, h, 14, 0, 2, 5, dark);
+                FillRect(px, w, h, 0, 14, 5, 2, dark); FillRect(px, w, h, 0, 11, 2, 5, dark);
+                FillRect(px, w, h, 11, 14, 5, 2, dark); FillRect(px, w, h, 14, 11, 2, 5, dark);
+
+                FillRect(px, w, h, 1, 1, 3, 1, hi); FillRect(px, w, h, 1, 1, 1, 3, hi);
+                FillRect(px, w, h, 12, 1, 3, 1, hi); FillRect(px, w, h, 14, 1, 1, 3, hi);
+                FillRect(px, w, h, 1, 14, 3, 1, hi); FillRect(px, w, h, 1, 12, 1, 3, hi);
+                FillRect(px, w, h, 12, 14, 3, 1, hi); FillRect(px, w, h, 14, 12, 1, 3, hi);
+            });
+        }
+
+        public static Sprite GetCraftingBenchSprite()
+        {
+            return GetOrBuild("prop_craftingbench", 26, 20, (w, h, px) =>
+            {
+                // Legs
+                FillRect(px, w, h, 3, 1, 3, 8, FrontierPalette.TimberDark);
+                FillRect(px, w, h, 20, 1, 3, 8, FrontierPalette.TimberDark);
+                // Lower shelf
+                FillRect(px, w, h, 4, 3, 18, 2, FrontierPalette.TimberWarm);
+                // Tabletop
+                FillRect(px, w, h, 2, 8, 22, 4, FrontierPalette.TimberWarm);
+                FillRect(px, w, h, 2, 11, 22, 1, FrontierPalette.DirtPath);
+                // Mortar & pestle (left)
+                FillRect(px, w, h, 5, 12, 5, 3, FrontierPalette.CobbleStone);
+                FillRect(px, w, h, 6, 15, 2, 2, FrontierPalette.TimberDark);
+                // Herb sprig (middle)
+                FillRect(px, w, h, 12, 12, 3, 3, FrontierPalette.HerbOlive);
+                SetPx(px, w, h, 13, 15, FrontierPalette.HearthGold);
+                // Glowing teal potion flask (right)
+                FillRect(px, w, h, 17, 12, 4, 4, FrontierPalette.FrontierTeal);
+                FillRect(px, w, h, 18, 16, 2, 2, FrontierPalette.CreamParchment);
+                SetPx(px, w, h, 18, 14, FrontierPalette.CreamParchment);
+                ApplyOutline(px, w, h, FrontierPalette.InkDark);
+            });
+        }
+
+        public static Sprite GetRestPostSprite()
+        {
+            return GetOrBuild("prop_restpost", 16, 20, (w, h, px) =>
+            {
+                // Cozy homestead signpost / moon lantern for resting until dawn
+                FillRect(px, w, h, 7, 1, 2, 14, FrontierPalette.TimberDark);
+                FillRect(px, w, h, 3, 9, 10, 5, FrontierPalette.TimberWarm);
+                FillRect(px, w, h, 4, 10, 8, 3, FrontierPalette.ElderIndigo);
+                // Crescent moon glyph
+                FillRect(px, w, h, 6, 11, 2, 2, FrontierPalette.HearthGold);
+                SetPx(px, w, h, 8, 11, FrontierPalette.HearthGold);
+                SetPx(px, w, h, 10, 12, FrontierPalette.CreamParchment);
+                // Cap
+                FillRect(px, w, h, 6, 15, 4, 2, FrontierPalette.BrassBorder);
+                ApplyOutline(px, w, h, FrontierPalette.InkDark);
+            });
+        }
+
         private static Sprite GetOrBuild(string key, int width, int height, System.Action<int, int, Color[]> paint, float ppu = PPU, Vector4 border = default)
         {
             if (Cache.TryGetValue(key, out Sprite existing) && existing != null)

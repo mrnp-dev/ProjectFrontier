@@ -15,7 +15,7 @@ namespace ProjectFrontier
         [Header("Movement")]
         public float moveSpeed = 4.2f;
         public float acceleration = 18f;
-        public Vector2 worldBoundsMin = new Vector2(-12.5f, -7.2f);
+        public Vector2 worldBoundsMin = new Vector2(-23.5f, -7.2f);
         public Vector2 worldBoundsMax = new Vector2(12.5f, 7.2f);
 
         [Header("Interaction")]
@@ -28,8 +28,16 @@ namespace ProjectFrontier
         private bool _useDebugInput;
         private Vector2 _currentVelocity;
         private VillageNpc _nearestNpc;
+        private HomesteadStation _nearestStation;
+        private bool _hasTargetPlot;
+        private int _targetPlotX = -1;
+        private int _targetPlotY = -1;
 
         public VillageNpc NearestNpc => _nearestNpc;
+        public HomesteadStation NearestStation => _nearestStation;
+        public bool HasTargetPlot => _hasTargetPlot;
+        public int TargetPlotX => _targetPlotX;
+        public int TargetPlotY => _targetPlotY;
         public CharacterMotion2D Motion => _motion;
         public Vector2 CurrentVelocity => _currentVelocity;
 
@@ -65,6 +73,8 @@ namespace ProjectFrontier
             var loop = FrontierGameLoop.Instance;
             if (loop == null || loop.State != RunState.Running) return;
 
+            if (FrontierFarmUI.IsAnyModalOpen) return;
+
             if (loop.DialogueOpen)
             {
                 loop.AdvanceDialogue();
@@ -74,6 +84,29 @@ namespace ProjectFrontier
             if (_nearestNpc != null)
             {
                 loop.OpenOrAdvanceDialogue(_nearestNpc);
+                return;
+            }
+
+            if (_nearestStation != null)
+            {
+                switch (_nearestStation.stationKind)
+                {
+                    case HomesteadStationKind.CraftingBench:
+                        FrontierFarmUI.Instance?.Open(FarmModalTab.Craft);
+                        break;
+                    case HomesteadStationKind.PipShop:
+                        FrontierFarmUI.Instance?.Open(FarmModalTab.PipShop);
+                        break;
+                    case HomesteadStationKind.RestBed:
+                        FrontierDayCycleManager.Instance?.RequestSleep(immediate: false);
+                        break;
+                }
+                return;
+            }
+
+            if (_hasTargetPlot && FrontierFarmManager.Instance != null)
+            {
+                FrontierFarmManager.Instance.InteractWithPlot(_targetPlotX, _targetPlotY);
             }
         }
 
@@ -82,12 +115,17 @@ namespace ProjectFrontier
             var loop = FrontierGameLoop.Instance;
             if (loop == null) return;
 
+            bool modalOpen = FrontierFarmUI.IsAnyModalOpen;
             var kb = Keyboard.current;
             if (kb != null)
             {
                 if (kb.escapeKey.wasPressedThisFrame)
                 {
-                    if (loop.State == RunState.Running && loop.DialogueOpen)
+                    if (modalOpen)
+                    {
+                        FrontierFarmUI.Instance?.Close();
+                    }
+                    else if (loop.State == RunState.Running && loop.DialogueOpen)
                     {
                         loop.CloseDialogue();
                     }
@@ -96,31 +134,40 @@ namespace ProjectFrontier
                         loop.TogglePause();
                     }
                 }
-                else if (loop.State == RunState.Running && !loop.DialogueOpen && (kb.eKey.wasPressedThisFrame || kb.spaceKey.wasPressedThisFrame))
+                else if (loop.State == RunState.Running && !loop.DialogueOpen && (kb.bKey.wasPressedThisFrame || kb.iKey.wasPressedThisFrame))
+                {
+                    FrontierFarmUI.Instance?.ToggleBag();
+                    modalOpen = FrontierFarmUI.IsAnyModalOpen;
+                }
+                else if (loop.State == RunState.Running && !loop.DialogueOpen && !modalOpen && (kb.eKey.wasPressedThisFrame || kb.spaceKey.wasPressedThisFrame))
                 {
                     TryInteract();
                 }
             }
 
-            if (loop.State != RunState.Running || loop.DialogueOpen)
+            if (loop.State != RunState.Running || loop.DialogueOpen || modalOpen)
             {
                 _currentVelocity = Vector2.Lerp(_currentVelocity, Vector2.zero, 1f - Mathf.Exp(-14f * Time.deltaTime));
                 _motion?.SetMotionState(_currentVelocity, moveSpeed);
+                FrontierFarmManager.Instance?.UpdatePlotCursor(false, -1, -1);
                 return;
             }
 
+            float speedMult = FrontierFarmManager.Instance != null ? FrontierFarmManager.Instance.GetMovementSpeedMultiplier() : 1f;
+            float effectiveSpeed = moveSpeed * speedMult;
             Vector2 input = ReadCombinedInput();
-            Vector2 targetVel = input * moveSpeed;
+            Vector2 targetVel = input * effectiveSpeed;
             _currentVelocity = Vector2.Lerp(_currentVelocity, targetVel, 1f - Mathf.Exp(-acceleration * Time.deltaTime));
 
-            _motion?.SetMotionState(_currentVelocity, moveSpeed);
+            _motion?.SetMotionState(_currentVelocity, effectiveSpeed);
             UpdateNearestNpc();
+            UpdateNearestStationAndPlot();
         }
 
         private void FixedUpdate()
         {
             var loop = FrontierGameLoop.Instance;
-            if (loop == null || loop.State != RunState.Running || loop.DialogueOpen) return;
+            if (loop == null || loop.State != RunState.Running || loop.DialogueOpen || FrontierFarmUI.IsAnyModalOpen) return;
 
             Vector2 nextPos = _rb.position + _currentVelocity * Time.fixedDeltaTime;
             nextPos.x = Mathf.Clamp(nextPos.x, worldBoundsMin.x, worldBoundsMax.x);
@@ -166,6 +213,51 @@ namespace ProjectFrontier
                 if (_nearestNpc != null) _nearestNpc.SetPromptHighlighted(false);
                 _nearestNpc = best;
                 if (_nearestNpc != null) _nearestNpc.SetPromptHighlighted(true);
+            }
+        }
+
+        private void UpdateNearestStationAndPlot()
+        {
+            HomesteadStation bestStation = null;
+            if (_nearestNpc == null)
+            {
+                float bestDistSq = float.MaxValue;
+                for (int i = 0; i < HomesteadStation.AllStations.Count; i++)
+                {
+                    var st = HomesteadStation.AllStations[i];
+                    if (st == null || !st.isActiveAndEnabled) continue;
+                    float r = st.interactRadius;
+                    float dSq = (st.transform.position - transform.position).sqrMagnitude;
+                    if (dSq <= r * r && dSq < bestDistSq)
+                    {
+                        bestDistSq = dSq;
+                        bestStation = st;
+                    }
+                }
+            }
+
+            if (_nearestStation != bestStation)
+            {
+                if (_nearestStation != null) _nearestStation.SetPromptHighlighted(false);
+                _nearestStation = bestStation;
+                if (_nearestStation != null) _nearestStation.SetPromptHighlighted(true);
+            }
+
+            var farm = FrontierFarmManager.Instance;
+            if (_nearestNpc == null && _nearestStation == null && farm != null
+                && farm.TryGetTargetPlot(transform.position, out int gx, out int gy))
+            {
+                _hasTargetPlot = true;
+                _targetPlotX = gx;
+                _targetPlotY = gy;
+                farm.UpdatePlotCursor(true, gx, gy);
+            }
+            else
+            {
+                _hasTargetPlot = false;
+                _targetPlotX = -1;
+                _targetPlotY = -1;
+                farm?.UpdatePlotCursor(false, -1, -1);
             }
         }
     }
