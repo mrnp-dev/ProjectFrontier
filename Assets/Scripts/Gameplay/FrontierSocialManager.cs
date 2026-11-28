@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
+using ProjectFrontier.Llm;
 using ProjectFrontier.Social;
 using ProjectFrontier.World;
 using UnityEngine;
@@ -152,7 +153,8 @@ namespace ProjectFrontier
             int count = GossipEngine.RunExchange(State, GossipTrust, _groupList, _transfers);
             // #42: listeners remember what they heard, and villagers pass on what the player told them (0 tokens).
             List<MemoryFact> shared = NpcMemoryGossip.Share(State.Memory, GossipTrust, _groupList, _transfers, State.Day, DisplayNameOf);
-            foreach (MemoryFact m in shared) Debug.Log($"[Memory] Day {State.Day}: {m.holderId} learned from {m.fromId}: \"{m.text}\"");
+            // Dev-only (#45): the line contains what the player said.
+            foreach (MemoryFact m in shared) MemoryLog.Text($"[Memory] Day {State.Day}: {m.holderId} learned from {m.fromId}: \"{m.text}\"");
             _dirty = true;
             SaveNow(forceCloud: false);
 
@@ -183,7 +185,7 @@ namespace ProjectFrontier
                 MemoryFact stored = State.Memory.Retain(f);
                 if (stored == null) continue;
                 n++;
-                Debug.Log($"[Memory] {stored.holderId} remembers (day {stored.day}, importance {stored.importance}): \"{stored.text}\"");
+                MemoryLog.Text($"[Memory] {stored.holderId} remembers (day {stored.day}, importance {stored.importance}): \"{stored.text}\"");
             }
             if (n > 0) { _dirty = true; SaveNow(forceCloud: false); }
             return n;
