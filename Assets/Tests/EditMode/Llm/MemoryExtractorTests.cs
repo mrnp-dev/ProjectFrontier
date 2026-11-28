@@ -187,7 +187,7 @@ namespace ProjectFrontier.Llm.Tests
             string system = withMemory.Messages[0].Content;
             StringAssert.Contains("You remember (bring up only if it fits):", system);
             StringAssert.Contains("- 2 days ago: The player's favourite crop is pumpkins.", system);
-            Assert.Less(system.IndexOf("You remember", StringComparison.Ordinal), system.IndexOf("Stay strictly", StringComparison.Ordinal));
+            Assert.Less(system.IndexOf("You remember", StringComparison.Ordinal), system.IndexOf(TurnPromptBuilder.OutputRules, StringComparison.Ordinal), "memories sit before the output rules");
             int extra = withMemory.EstimatedInputTokens - without.EstimatedInputTokens;
             Assert.Greater(extra, 0);
             Assert.LessOrEqual(extra, 90, "recalled memories stay within ~90 tokens");

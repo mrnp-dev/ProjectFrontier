@@ -15,8 +15,8 @@ namespace ProjectFrontier
 
     /// <summary>
     /// Persona card for one vertical-slice villager. Designer-editable asset under Assets/Data/Personas/.
-    /// Feeds the scripted greeting today and the compact LLM persona block later (#13/#14),
-    /// so keep every field short: the whole card should stay around ~100 prompt tokens.
+    /// Feeds the scripted greeting and the compact LLM persona block (#13/#14/#41).
+    /// Keep every field short: the whole card should stay around ~200 estimated prompt tokens.
     /// </summary>
     [CreateAssetMenu(fileName = "NpcPersona", menuName = "ProjectFrontier/NPC Persona")]
     public class NpcPersona : ScriptableObject
@@ -32,6 +32,11 @@ namespace ProjectFrontier
         [TextArea(1, 3)] public string gameplayTieIn;
         [TextArea(2, 4)] public string personality;
         [TextArea(1, 3)] public string speechStyle;
+        [Tooltip("Concrete things this villager knows and likes (job, wares, tastes). Gives the LLM something specific to " +
+                 "answer with instead of a signature line (#41). Short clauses, second person.")]
+        public string[] knowledge = new string[0];
+        [Tooltip("One short opinion per other villager, e.g. \"Lyra reckless, chips every blade\".")]
+        public string[] opinions = new string[0];
         [Tooltip("Story / relationship hooks the LLM and gossip engine can lean on.")]
         public string[] hooks = new string[0];
 
@@ -61,21 +66,28 @@ namespace ProjectFrontier
         /// </summary>
         public string ToPromptCard()
         {
-            var sb = new StringBuilder(256);
-            sb.Append("You are ").Append(displayName).Append(", ").Append(roleTitle).Append(" of Oakhaven.\n");
-            sb.Append("Personality: ").Append(personality).Append('\n');
+            var sb = new StringBuilder(512);
+            sb.Append("You are ").Append(displayName).Append(", ").Append(roleTitle).Append(" of Oakhaven.");
+            if (!string.IsNullOrWhiteSpace(personality)) sb.Append(' ').Append(personality.Trim());
+            sb.Append('\n');
             sb.Append("Speech: ").Append(speechStyle).Append('\n');
-            if (hooks != null && hooks.Length > 0)
-            {
-                sb.Append("Hooks: ");
-                for (int i = 0; i < hooks.Length; i++)
-                {
-                    if (i > 0) sb.Append("; ");
-                    sb.Append(hooks[i]);
-                }
-                sb.Append('\n');
-            }
+            AppendList(sb, "Knows: ", knowledge);
+            AppendList(sb, "Thinks: ", opinions);
+            AppendList(sb, "Story: ", hooks);
             return sb.ToString();
+        }
+
+        private static void AppendList(StringBuilder sb, string label, string[] items)
+        {
+            if (items == null) return;
+            bool any = false;
+            foreach (string item in items)
+            {
+                if (string.IsNullOrWhiteSpace(item)) continue;
+                sb.Append(any ? "; " : label).Append(item.Trim());
+                any = true;
+            }
+            if (any) sb.Append('\n');
         }
     }
 }

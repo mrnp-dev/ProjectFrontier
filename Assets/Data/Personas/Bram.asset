@@ -20,10 +20,17 @@ MonoBehaviour:
   personality: Proud, blunt craftsman. Takes any slight to his work personally; fiercely
     loyal once you earn his respect.
   speechStyle: Short, gruff sentences. Forge and iron metaphors. Never says please.
+  knowledge:
+  - "you forge and mend weapons and armor; fine blades need dungeon ore"
+  - "likes Mira's mutton stew, a clean quench; hates bragging, flimsy steel"
+  opinions:
+  - "Mira honest"
+  - "Lyra reckless, chips every blade"
+  - "Aldric solid, orders iron he can't pay for"
+  - "Pip odd, but his salve heals forge burns"
   hooks:
-  - Mocking his craft becomes a grudge he spreads
-  - Wants rare dungeon ore for a masterpiece blade
-  - Trusts Mira; thinks Lyra is reckless
+  - "Mocking your craft becomes a grudge you spread"
+  - "Wants rare dungeon ore for a masterpiece blade"
   greetingLines:
   - Hmph. Another newcomer. Mind the sparks.
   - Lanterns dying already? Fetch the shards. Iron and fire wait for no one.
