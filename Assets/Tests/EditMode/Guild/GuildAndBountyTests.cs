@@ -325,9 +325,12 @@ namespace ProjectFrontier.Guild.Tests
             // No cloud yet: push existing local, nothing to do for a pristine install.
             Assert.AreEqual(GuildReconcileAction.PushLocal, GuildCloudSync.Decide(true, false, 0, 500, false));
             Assert.AreEqual(GuildReconcileAction.InSync, GuildCloudSync.Decide(true, false, 0, 0, false));
-            // Dirty session: in-session progress is kept and pushed even if cloud is newer.
-            Assert.AreEqual(GuildReconcileAction.PushLocal, GuildCloudSync.Decide(true, true, 900, 500, true));
+            // Dirty session on a new/stale device: newer cloud still wins (pre-reconcile actions are dropped).
+            Assert.AreEqual(GuildReconcileAction.AdoptCloud, GuildCloudSync.Decide(true, true, 900, 0, true));
+            Assert.AreEqual(GuildReconcileAction.AdoptCloud, GuildCloudSync.Decide(true, true, 900, 500, true));
+            // Dirty session with no newer cloud: progress is kept and pushed.
             Assert.AreEqual(GuildReconcileAction.PushLocal, GuildCloudSync.Decide(true, false, 0, 0, true));
+            Assert.AreEqual(GuildReconcileAction.PushLocal, GuildCloudSync.Decide(true, true, 500, 500, true));
             // Same snapshot: nothing to move.
             Assert.AreEqual(GuildReconcileAction.InSync, GuildCloudSync.Decide(true, true, 500, 500, false));
         }

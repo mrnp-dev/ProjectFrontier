@@ -461,7 +461,11 @@ namespace ProjectFrontier
                 // Loop so a save requested mid-flight (e.g. pause/quit) runs as a trailing write.
                 while (_cloudPending && this != null && State != null)
                 {
-                    if (!LiveOpsAllowsWrites()) break;   // stays pending
+                    if (!LiveOpsAllowsWrites())
+                    {
+                        _lastCloudSaveTime = Time.realtimeSinceStartup;   // stays pending; retry on the interval
+                        break;
+                    }
                     _cloudPending = false;
                     _lastCloudSaveTime = Time.realtimeSinceStartup;
                     GuildSaveData snapshot = State.ToSaveData(_localSavedAt);
@@ -498,14 +502,16 @@ namespace ProjectFrontier
 
         /// <summary>
         /// Reads the cloud copy (awaiting sign-in) and applies <see cref="GuildCloudSync.Decide"/>.
-        /// Cloud writes stay blocked until this succeeds, so starter state can never overwrite cloud progress.
+        /// Cloud writes stay blocked until the read succeeds. If the cloud copy is newer than the local save we
+        /// booted from, it is adopted even when the player already acted this session (those actions are dropped),
+        /// so starter or stale local state never overwrites newer cloud progress. Otherwise local is pushed up.
         /// </summary>
         private async Task ReconcileWithCloudAsync()
         {
             if (_reconciled || _reconcileInFlight) return;
+            _lastReconcileAttempt = Time.realtimeSinceStartup;   // throttle retries even when LiveOps is off
             if (FrontierLiveManager.Instance != null && !FrontierLiveManager.Instance.LiveOpsEnabled) return;
             _reconcileInFlight = true;
-            _lastReconcileAttempt = Time.realtimeSinceStartup;
             try
             {
                 var (ok, found, cloud) = await PlayerSave.TryLoadAsync<GuildSaveData>(CloudKey);
@@ -525,7 +531,9 @@ namespace ProjectFrontier
                         _localSavedAt = cloud.savedAtUnixMs;
                         _dirty = false;
                         _cloudPending = false;
+                        _actedBeforeReconcile = false;
                         LastSaveStatus = "Cloud loaded";
+                        StatusFeedback?.Invoke("Guild progress restored from cloud");
                         _flavorFailed.Clear();
                         _ = RefreshBoardFlavorAsync();
                         break;
