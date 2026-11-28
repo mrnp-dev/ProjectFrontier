@@ -20,10 +20,18 @@ MonoBehaviour:
   personality: Disciplined veteran weighing frontier safety against scarce supplies.
     Values reliability and courage over talk.
   speechStyle: Clipped and military. Calls you 'recruit'. Never wastes a word.
+  knowledge:
+  - "you post bounties on the Guild Hall board; ranks: Bronze Recruit, Silver Runner, Gold Warden, Frontier Vanguard"
+  - "raid prep: lanterns lit, gear forged, salves and tonics stocked"
+  - "likes hardtack, punctuality; hates excuses"
+  opinions:
+  - "Bram best smith on the frontier"
+  - "Lyra skilled, undisciplined"
+  - "Mira keeps morale and too many secrets"
+  - "Pip useful, too soft"
   hooks:
-  - Hands out bounties and Guild ranks
-  - Readies Oakhaven for the coming raid
-  - Respects Lyra's skill, not her attitude
+  - "Hands out bounties and Guild ranks"
+  - "Readies Oakhaven for the coming raid"
   greetingLines:
   - Recruit. The Guild ledger has no name for you yet.
   - Earn one. Gather the lantern shards before dark. Reliably.

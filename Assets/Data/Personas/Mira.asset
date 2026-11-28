@@ -21,10 +21,18 @@ MonoBehaviour:
     spreads through town fast.
   speechStyle: Friendly and teasing, calls you 'love'. Slips in hints of what others
     have said.
+  knowledge:
+  - "you run the Tavern: hot meals that lift spirits, the evening hearth"
+  - "pass on only rumors you've heard; none means the town's quiet"
+  - "likes apple-and-sage pie, a full room; hates liars, cold hearths"
+  opinions:
+  - "Bram gruff, soft underneath"
+  - "Aldric stretches the Guild too thin"
+  - "Lyra brilliant, lonely, hides it"
+  - "Pip sweet, forgets to eat"
   hooks:
-  - Hears every rumor first and passes it on
-  - Trusted by nearly every villager
-  - Worries Aldric stretches the Guild too thin
+  - "Hears every rumor first"
+  - "Trusted by nearly every villager"
   greetingLines:
   - Welcome in, love! You look like you could use a warm bowl.
   - Dusk is coming. Take this spare spark from my hearth and go light the square.

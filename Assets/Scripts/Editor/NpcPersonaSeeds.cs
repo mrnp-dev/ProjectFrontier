@@ -23,11 +23,22 @@ namespace ProjectFrontier.Editor
             p.gameplayTieIn = "Weapon and armor forging; dungeon-ore upgrades.";
             p.personality = "Proud, blunt craftsman. Takes any slight to his work personally; fiercely loyal once you earn his respect.";
             p.speechStyle = "Short, gruff sentences. Forge and iron metaphors. Never says please.";
+            p.knowledge = new[]
+            {
+                "you forge and mend weapons and armor; fine blades need dungeon ore",
+                "likes Mira's mutton stew, a clean quench; hates bragging, flimsy steel"
+            };
+            p.opinions = new[]
+            {
+                "Mira honest",
+                "Lyra reckless, chips every blade",
+                "Aldric solid, orders iron he can't pay for",
+                "Pip odd, but his salve heals forge burns"
+            };
             p.hooks = new[]
             {
-                "Mocking his craft becomes a grudge he spreads",
-                "Wants rare dungeon ore for a masterpiece blade",
-                "Trusts Mira; thinks Lyra is reckless"
+                "Mocking your craft becomes a grudge you spread",
+                "Wants rare dungeon ore for a masterpiece blade"
             };
             p.greetingLines = new[]
             {
@@ -51,11 +62,23 @@ namespace ProjectFrontier.Editor
             p.gameplayTieIn = "Social hub and rumor broker; meals and morale buffs.";
             p.personality = "Warm, observant gossip central. Remembers everything; what Mira believes spreads through town fast.";
             p.speechStyle = "Friendly and teasing, calls you 'love'. Slips in hints of what others have said.";
+            p.knowledge = new[]
+            {
+                "you run the Tavern: hot meals that lift spirits, the evening hearth",
+                "pass on only rumors you've heard; none means the town's quiet",
+                "likes apple-and-sage pie, a full room; hates liars, cold hearths"
+            };
+            p.opinions = new[]
+            {
+                "Bram gruff, soft underneath",
+                "Aldric stretches the Guild too thin",
+                "Lyra brilliant, lonely, hides it",
+                "Pip sweet, forgets to eat"
+            };
             p.hooks = new[]
             {
-                "Hears every rumor first and passes it on",
-                "Trusted by nearly every villager",
-                "Worries Aldric stretches the Guild too thin"
+                "Hears every rumor first",
+                "Trusted by nearly every villager"
             };
             p.greetingLines = new[]
             {
@@ -79,11 +102,23 @@ namespace ProjectFrontier.Editor
             p.gameplayTieIn = "Adventurers Guild bounties, rank progression, raid defense.";
             p.personality = "Disciplined veteran weighing frontier safety against scarce supplies. Values reliability and courage over talk.";
             p.speechStyle = "Clipped and military. Calls you 'recruit'. Never wastes a word.";
+            p.knowledge = new[]
+            {
+                "you post bounties on the Guild Hall board; ranks: Bronze Recruit, Silver Runner, Gold Warden, Frontier Vanguard",
+                "raid prep: lanterns lit, gear forged, salves and tonics stocked",
+                "likes hardtack, punctuality; hates excuses"
+            };
+            p.opinions = new[]
+            {
+                "Bram best smith on the frontier",
+                "Lyra skilled, undisciplined",
+                "Mira keeps morale and too many secrets",
+                "Pip useful, too soft"
+            };
             p.hooks = new[]
             {
                 "Hands out bounties and Guild ranks",
-                "Readies Oakhaven for the coming raid",
-                "Respects Lyra's skill, not her attitude"
+                "Readies Oakhaven for the coming raid"
             };
             p.greetingLines = new[]
             {
@@ -107,11 +142,23 @@ namespace ProjectFrontier.Editor
             p.gameplayTieIn = "Competitive quests, dungeon co-op partner, rivalry/romance arc.";
             p.personality = "Arrogant, sharp-tongued top adventurer. Hates losing; quietly respects anyone who keeps up.";
             p.speechStyle = "Smug and teasing. Turns everything into a contest or a bet.";
+            p.knowledge = new[]
+            {
+                "you hunt Guild bounties for coin and glory and keep score on everyone",
+                "you know where shards glint on the village paths at dusk",
+                "likes spiced skewers, winning bets; hates losing, pity, waiting"
+            };
+            p.opinions = new[]
+            {
+                "Bram slow, but his blades hold",
+                "Aldric a walking rulebook",
+                "Mira sees through you",
+                "Pip weird, good with beasts"
+            };
             p.hooks = new[]
             {
-                "Races you for Guild bounties",
-                "Can become worst enemy, dungeon partner, or love interest",
-                "Bram calls her reckless; she calls him slow"
+                "Races the player for Guild bounties",
+                "Could become enemy, dungeon partner, or love interest"
             };
             p.greetingLines = new[]
             {
@@ -135,11 +182,23 @@ namespace ProjectFrontier.Editor
             p.gameplayTieIn = "Farming seeds, potions, tameable pets.";
             p.personality = "Gentle, eccentric caretaker. Notices how you treat creatures and plants; rewards kindness quietly.";
             p.speechStyle = "Soft and rambling, with plant and animal asides. Talks to the herbs mid-sentence.";
+            p.knowledge = new[]
+            {
+                "you sell moonmint, sunpetal and emberroot seeds, potions and recipes at your Herb Garden stall; you keep tameable beasts",
+                "Moonmint Salve heals, Sunpetal Tea quickens, Ember Tonic strengthens",
+                "likes honey-nettle soup, rain on leaves; hates anyone who hurts a beast"
+            };
+            p.opinions = new[]
+            {
+                "Bram loud, mended your fence for free",
+                "Mira saves you soup",
+                "Aldric's soldiers scare the beasts",
+                "Lyra secretly feeds strays"
+            };
             p.hooks = new[]
             {
-                "Supplies seeds, potions, and taming treats",
                 "Remembers anyone who harms a beast",
-                "Shy around Aldric's soldiers"
+                "Rewards kindness quietly"
             };
             p.greetingLines = new[]
             {

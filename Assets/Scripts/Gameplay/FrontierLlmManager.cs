@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using ProjectFrontier.Llm;
 using ProjectFrontier.Social;
+using ProjectFrontier.World;
 using Unity.Services.Authentication;
 using UnityEngine;
 
@@ -24,8 +25,9 @@ namespace ProjectFrontier
         public const string DeviceConfigFileName = "frontier_llm.json";
         public const string DotEnvFileName = ".env";
 
-        [Tooltip("Messages kept per conversation (player + NPC lines). The prompt uses at most 4 of them.")]
-        public int storedHistoryMessages = 8;
+        [Tooltip("Messages kept per conversation (player + NPC lines). The prompt replays the last 4; older NPC lines " +
+                 "are listed as \"don't repeat\" (#41).")]
+        public int storedHistoryMessages = 10;
 
         public LlmTurnService Service { get; private set; }
         public LlmEndpointConfig Config { get; private set; }
@@ -156,6 +158,7 @@ namespace ProjectFrontier
                     NpcId = npcId,
                     NpcDisplayName = persona.displayName,
                     PersonaCard = persona.ToPromptCard(),
+                    NowLine = BuildNowLine(npcId, state?.Day ?? 1),
                     StandingLine = state?.Get(npcId).ToPromptLine(),
                     RumorLine = state != null ? TurnPromptBuilder.BuildRumorLine(state.Rumors, npcId, state.Day, DisplayNameOf) : null,
                     Day = state?.Day ?? 1,
@@ -169,6 +172,10 @@ namespace ProjectFrontier
 
                 Remember(npcId, new ChatMessage(ChatRole.User, message));
                 Remember(npcId, new ChatMessage(ChatRole.Assistant, result.Dialogue));
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+                // Dev-only transcript line so repetition can be checked from logcat (#41). Never in release builds.
+                Debug.Log($"[LLM] chat {npcId}: P=\"{message}\" NPC=\"{result.Dialogue}\" mood={result.Mood}");
+#endif
 
                 if (social != null && !result.Deltas.IsZero)
                     result.AppliedDeltas = social.ApplyDelta(npcId, result.Deltas, DeltaSource.LlmTurn).Applied;
@@ -194,6 +201,18 @@ namespace ProjectFrontier
             list.Add(message);
             int overflow = list.Count - Mathf.Max(2, storedHistoryMessages);
             if (overflow > 0) list.RemoveRange(0, overflow);
+        }
+
+        /// <summary>Live "Now:" line: day, phase, where this villager is per the schedule, and lantern progress.</summary>
+        private static string BuildNowLine(string npcId, int day)
+        {
+            var cycle = FrontierDayCycleManager.Instance;
+            DayPhase phase = cycle != null ? cycle.CurrentPhase : DayPhase.Morning;
+            if (cycle != null) day = cycle.CurrentDay;
+            string place = NpcScheduleTable.SpotDisplayName(NpcScheduleTable.GetScheduledSpot(npcId, phase, day));
+            var loop = FrontierGameLoop.Instance;
+            return TurnPromptBuilder.BuildNowLine(day, phase.ToString(), place,
+                loop != null ? loop.CollectedLanterns : 0, loop != null ? loop.GoalLanterns : 0);
         }
 
         private static string DisplayNameOf(string npcId)

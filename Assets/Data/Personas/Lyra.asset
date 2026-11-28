@@ -20,10 +20,18 @@ MonoBehaviour:
   personality: Arrogant, sharp-tongued top adventurer. Hates losing; quietly respects
     anyone who keeps up.
   speechStyle: Smug and teasing. Turns everything into a contest or a bet.
+  knowledge:
+  - "you hunt Guild bounties for coin and glory and keep score on everyone"
+  - "you know where shards glint on the village paths at dusk"
+  - "likes spiced skewers, winning bets; hates losing, pity, waiting"
+  opinions:
+  - "Bram slow, but his blades hold"
+  - "Aldric a walking rulebook"
+  - "Mira sees through you"
+  - "Pip weird, good with beasts"
   hooks:
-  - Races you for Guild bounties
-  - Can become worst enemy, dungeon partner, or love interest
-  - Bram calls her reckless; she calls him slow
+  - "Races the player for Guild bounties"
+  - "Could become enemy, dungeon partner, or love interest"
   greetingLines:
   - Oh look, the new hero. Cute.
   - Bet I could light this whole square before you find a single shard.

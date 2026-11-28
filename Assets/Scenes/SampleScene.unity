@@ -75366,7 +75366,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e472dbb6277d875cf9e148f38f76a598, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ProjectFrontier.FrontierLlmManager
-  storedHistoryMessages: 8
+  storedHistoryMessages: 10
 --- !u!114 &1501419665
 MonoBehaviour:
   m_ObjectHideFlags: 0

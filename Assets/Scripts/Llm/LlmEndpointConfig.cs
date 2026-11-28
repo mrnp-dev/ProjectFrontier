@@ -31,7 +31,11 @@ namespace ProjectFrontier.Llm
         public bool jsonMode = true;
         public float timeoutSeconds = 8f;
         public int maxTokens = TurnPromptBuilder.DefaultMaxOutputTokens;
-        public float temperature = 0.8f;
+        /// <summary>Sampling temperature. 0.85 (was 0.8) for a little more variety between turns (#41).</summary>
+        public float temperature = 0.85f;
+        /// <summary>OpenAI-style repetition penalties (#41). 0 = not sent, for providers that reject them.</summary>
+        public float frequencyPenalty = 0.3f;
+        public float presencePenalty = 0.2f;
         public int offlineLatencyMs = 400;
         /// <summary>Optional "low" / "medium" / "high" for reasoning models (gpt-oss, o-series). Empty = not sent.</summary>
         public string reasoningEffort = "";
@@ -155,6 +159,6 @@ namespace ProjectFrontier.Llm
 
         /// <summary>Safe for logs: never includes the key.</summary>
         public override string ToString() =>
-            $"mode={Mode} url={ChatCompletionsUrl ?? "-"} model={(string.IsNullOrEmpty(model) ? "-" : model)} key={(string.IsNullOrEmpty(apiKey) ? "none" : "set")} json={jsonMode} reasoning={(HasReasoningEffort ? reasoningEffort.Trim() : "-")} timeout={timeoutSeconds}s";
+            $"mode={Mode} url={ChatCompletionsUrl ?? "-"} model={(string.IsNullOrEmpty(model) ? "-" : model)} key={(string.IsNullOrEmpty(apiKey) ? "none" : "set")} json={jsonMode} temp={temperature:0.##} pen={frequencyPenalty:0.##}/{presencePenalty:0.##} reasoning={(HasReasoningEffort ? reasoningEffort.Trim() : "-")} timeout={timeoutSeconds}s";
     }
 }
