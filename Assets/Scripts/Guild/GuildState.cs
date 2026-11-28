@@ -114,7 +114,11 @@ namespace ProjectFrontier.Guild
 
             bool dayAdvanced = safeDay != BoardDay;
             BoardDay = safeDay;
-            if (dayAdvanced) _completedToday.Clear();
+            if (dayAdvanced)
+            {
+                _completedToday.Clear();
+                PruneFlavorCache(safeDay);
+            }
 
             RebuildBoardList(safeDay);
             Changed?.Invoke();
@@ -436,6 +440,26 @@ namespace ProjectFrontier.Guild
             return _flavorCache.TryGetValue(MakeFlavorKey(day, bountyId), out flavor) && !string.IsNullOrWhiteSpace(flavor);
         }
 
+        public int CachedFlavorCount => _flavorCache.Count;
+
+        /// <summary>
+        /// Flavor is keyed per day, so older entries are never read again. Drop them so the
+        /// cache (and the local/Cloud Save payload) stays bounded at one board's worth.
+        /// </summary>
+        private void PruneFlavorCache(int keepDay)
+        {
+            if (_flavorCache.Count == 0) return;
+            string prefix = $"{Math.Max(1, keepDay)}:";
+            List<string> stale = null;
+            foreach (string key in _flavorCache.Keys)
+            {
+                if (key.StartsWith(prefix, StringComparison.Ordinal)) continue;
+                (stale ??= new List<string>()).Add(key);
+            }
+            if (stale == null) return;
+            for (int i = 0; i < stale.Count; i++) _flavorCache.Remove(stale[i]);
+        }
+
         public string GetDisplayDescription(BountyDef def, int day)
         {
             if (def == null) return string.Empty;
@@ -551,6 +575,7 @@ namespace ProjectFrontier.Guild
                     if (kv != null && !string.IsNullOrEmpty(kv.key) && !string.IsNullOrWhiteSpace(kv.text))
                         _flavorCache[kv.key] = kv.text.Trim();
                 }
+                PruneFlavorCache(BoardDay);
             }
 
             if (_boardBountyIds.Count == 0) RebuildBoardList(BoardDay);

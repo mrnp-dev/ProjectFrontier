@@ -194,5 +194,28 @@ namespace ProjectFrontier.Guild.Tests
             Assert.AreEqual("Aldric wants the west rows logged before rain.",
                 restored.GetDisplayDescription(GuildCatalog.GetBounty(GuildCatalog.BountyHomesteadHarvest), 2));
         }
+
+        [Test]
+        public void FlavorCache_DropsPreviousDays_SoSavePayloadStaysBounded()
+        {
+            var guild = new GuildState(initialDay: 1);
+            guild.SetCachedFlavor(1, GuildCatalog.BountyHomesteadHarvest, "Day one notice for the west rows.");
+            guild.SetCachedFlavor(1, GuildCatalog.BountyMoonmintSupplies, "Day one notice for moonmint stock.");
+            Assert.AreEqual(2, guild.CachedFlavorCount);
+
+            guild.RefreshBoardForDay(2);
+            Assert.AreEqual(0, guild.CachedFlavorCount);
+            Assert.AreEqual(GuildCatalog.GetBounty(GuildCatalog.BountyHomesteadHarvest).StaticDescription,
+                guild.GetDisplayDescription(GuildCatalog.GetBounty(GuildCatalog.BountyHomesteadHarvest), 2));
+
+            guild.SetCachedFlavor(2, GuildCatalog.BountyHomesteadHarvest, "Day two notice for the west rows.");
+            GuildSaveData saved = guild.ToSaveData(1L);
+            saved.flavorCache.Add(new CachedFlavorRecord { key = "1:stale", text = "An old notice nobody reads." });
+
+            var restored = new GuildState(initialDay: 2);
+            restored.LoadFrom(saved, 2);
+            Assert.AreEqual(1, restored.CachedFlavorCount);
+            Assert.IsTrue(restored.TryGetCachedFlavor(2, GuildCatalog.BountyHomesteadHarvest, out _));
+        }
     }
 }
