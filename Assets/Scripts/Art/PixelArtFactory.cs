@@ -783,6 +783,47 @@ namespace ProjectFrontier
             });
         }
 
+        public static Sprite GetRankLedgerSprite()
+        {
+            return GetOrBuild("prop_rankledger", 18, 20, (w, h, px) =>
+            {
+                // Guild brass-trimmed wooden podium & open rank ledger (#20)
+                FillRect(px, w, h, 4, 1, 10, 2, FrontierPalette.TimberDark);
+                FillRect(px, w, h, 6, 3, 6, 8, FrontierPalette.TimberWarm);
+                FillRect(px, w, h, 7, 4, 4, 6, FrontierPalette.GuildNavy);
+                FillRect(px, w, h, 8, 6, 2, 2, FrontierPalette.HearthGold);
+                // Slanted lectern top
+                FillRect(px, w, h, 2, 11, 14, 3, FrontierPalette.TimberDark);
+                FillRect(px, w, h, 3, 12, 12, 2, FrontierPalette.BrassBorder);
+                // Open parchment ledger with wax seal
+                FillRect(px, w, h, 4, 13, 10, 5, FrontierPalette.CreamParchment);
+                FillRect(px, w, h, 8, 13, 2, 5, FrontierPalette.DirtEdge);
+                SetPx(px, w, h, 6, 16, FrontierPalette.TimberDark);
+                SetPx(px, w, h, 11, 16, FrontierPalette.TimberDark);
+                SetPx(px, w, h, 12, 14, FrontierPalette.DuskAlert);
+                ApplyOutline(px, w, h, FrontierPalette.InkDark);
+            });
+        }
+
+        public static Sprite GetGuildBannerSprite()
+        {
+            return GetOrBuild("prop_guildbanner", 14, 26, (w, h, px) =>
+            {
+                // Standing Adventurers Guild navy-and-gold standard (#20)
+                FillRect(px, w, h, 4, 1, 6, 2, FrontierPalette.CobbleStone);
+                FillRect(px, w, h, 6, 3, 2, 20, FrontierPalette.TimberDark);
+                FillRect(px, w, h, 5, 22, 4, 2, FrontierPalette.HearthGold);
+                FillRect(px, w, h, 2, 20, 10, 2, FrontierPalette.BrassBorder);
+                // Navy pennant cloth + gold crest
+                FillRect(px, w, h, 3, 8, 8, 12, FrontierPalette.GuildNavy);
+                FillRect(px, w, h, 4, 6, 6, 2, FrontierPalette.GuildNavy);
+                FillRect(px, w, h, 6, 12, 2, 5, FrontierPalette.HearthGold);
+                FillRect(px, w, h, 5, 14, 4, 2, FrontierPalette.HearthGold);
+                SetPx(px, w, h, 6, 17, FrontierPalette.CreamParchment);
+                ApplyOutline(px, w, h, FrontierPalette.InkDark);
+            });
+        }
+
         private static Sprite GetOrBuild(string key, int width, int height, System.Action<int, int, Color[]> paint, float ppu = PPU, Vector4 border = default)
         {
             if (Cache.TryGetValue(key, out Sprite existing) && existing != null)

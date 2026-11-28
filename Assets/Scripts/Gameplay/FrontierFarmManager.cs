@@ -54,6 +54,8 @@ namespace ProjectFrontier
             : (FrontierSocialManager.Instance != null ? FrontierSocialManager.Instance.State.Day : 1);
 
         public event Action<string> StatusFeedback;
+        public event Action<string, int> CropHarvested;
+        public event Action<string, int> ItemCrafted;
 
         private SpriteRenderer[] _soilRenderers;
         private SpriteRenderer[] _cropRenderers;
@@ -231,6 +233,7 @@ namespace ProjectFrontier
                 {
                     SynthAudioManager.Instance?.PlayPickup();
                     FeelManager.Instance?.PlayPickupFeedback(worldPos + Vector3.up * 0.25f, result.Message);
+                    CropHarvested?.Invoke(result.ItemId, result.Quantity);
                 }
                 else
                 {
@@ -281,6 +284,7 @@ namespace ProjectFrontier
                 FeelManager.Instance?.PlayPickupFeedback(PlayerController2D.Instance.transform.position + Vector3.up * 0.5f, message);
             }
             SaveNow(forceCloud: false);
+            ItemCrafted?.Invoke(crafted.Id, 1);
             StatusFeedback?.Invoke(message);
             return true;
         }

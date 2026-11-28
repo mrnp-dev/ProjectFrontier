@@ -392,6 +392,7 @@ namespace ProjectFrontier
                 if (hybridChatbox != null) hybridChatbox.Close();
                 else if (dialogueRoot != null) dialogueRoot.SetActive(false);
                 FrontierFarmUI.Instance?.Close();
+                FrontierGuildUI.Instance?.Close();
             }
             if (state == RunState.Ready || state == RunState.Paused) FeelManager.Instance?.HideTransientOverlays();
 
@@ -510,7 +511,7 @@ namespace ProjectFrontier
         {
             var player = PlayerController2D.Instance;
             var loop = FrontierGameLoop.Instance;
-            bool modalBlocking = (loop != null && loop.DialogueOpen) || FrontierFarmUI.IsAnyModalOpen;
+            bool modalBlocking = (loop != null && loop.DialogueOpen) || FrontierFarmUI.IsAnyModalOpen || FrontierGuildUI.IsAnyModalOpen;
             if (touchJoystickRoot != null && touchJoystickRoot.activeSelf == modalBlocking)
                 touchJoystickRoot.SetActive(!modalBlocking);
 

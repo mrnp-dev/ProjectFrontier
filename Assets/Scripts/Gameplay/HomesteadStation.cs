@@ -7,7 +7,9 @@ namespace ProjectFrontier
     {
         CraftingBench = 0,
         PipShop = 1,
-        RestBed = 2
+        RestBed = 2,
+        GuildBoard = 3,
+        GuildLedger = 4
     }
 
     /// <summary>
@@ -72,6 +74,8 @@ namespace ProjectFrontier
             HomesteadStationKind.CraftingBench => "CRAFT",
             HomesteadStationKind.PipShop => "SHOP",
             HomesteadStationKind.RestBed => "REST",
+            HomesteadStationKind.GuildBoard => "BOUNTIES",
+            HomesteadStationKind.GuildLedger => "RANK",
             _ => "USE"
         };
 
@@ -80,6 +84,8 @@ namespace ProjectFrontier
             HomesteadStationKind.CraftingBench => FrontierPalette.HearthGold,
             HomesteadStationKind.PipShop => FrontierPalette.HerbOlive,
             HomesteadStationKind.RestBed => FrontierPalette.ElderIndigo,
+            HomesteadStationKind.GuildBoard => FrontierPalette.GuildNavy,
+            HomesteadStationKind.GuildLedger => FrontierPalette.HearthGold,
             _ => FrontierPalette.FrontierTeal
         };
     }

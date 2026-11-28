@@ -73,7 +73,7 @@ namespace ProjectFrontier
             var loop = FrontierGameLoop.Instance;
             if (loop == null || loop.State != RunState.Running) return;
 
-            if (FrontierFarmUI.IsAnyModalOpen) return;
+            if (FrontierFarmUI.IsAnyModalOpen || FrontierGuildUI.IsAnyModalOpen) return;
 
             if (loop.DialogueOpen)
             {
@@ -100,6 +100,12 @@ namespace ProjectFrontier
                     case HomesteadStationKind.RestBed:
                         FrontierDayCycleManager.Instance?.RequestSleep(immediate: false);
                         break;
+                    case HomesteadStationKind.GuildBoard:
+                        FrontierGuildUI.Instance?.Open(GuildModalTab.Board);
+                        break;
+                    case HomesteadStationKind.GuildLedger:
+                        FrontierGuildUI.Instance?.Open(GuildModalTab.Rank);
+                        break;
                 }
                 return;
             }
@@ -115,13 +121,17 @@ namespace ProjectFrontier
             var loop = FrontierGameLoop.Instance;
             if (loop == null) return;
 
-            bool modalOpen = FrontierFarmUI.IsAnyModalOpen;
+            bool modalOpen = FrontierFarmUI.IsAnyModalOpen || FrontierGuildUI.IsAnyModalOpen;
             var kb = Keyboard.current;
             if (kb != null)
             {
                 if (kb.escapeKey.wasPressedThisFrame)
                 {
-                    if (modalOpen)
+                    if (FrontierGuildUI.IsAnyModalOpen)
+                    {
+                        FrontierGuildUI.Instance?.Close();
+                    }
+                    else if (FrontierFarmUI.IsAnyModalOpen)
                     {
                         FrontierFarmUI.Instance?.Close();
                     }
@@ -137,7 +147,12 @@ namespace ProjectFrontier
                 else if (loop.State == RunState.Running && !loop.DialogueOpen && (kb.bKey.wasPressedThisFrame || kb.iKey.wasPressedThisFrame))
                 {
                     FrontierFarmUI.Instance?.ToggleBag();
-                    modalOpen = FrontierFarmUI.IsAnyModalOpen;
+                    modalOpen = FrontierFarmUI.IsAnyModalOpen || FrontierGuildUI.IsAnyModalOpen;
+                }
+                else if (loop.State == RunState.Running && !loop.DialogueOpen && kb.gKey.wasPressedThisFrame)
+                {
+                    FrontierGuildUI.Instance?.ToggleBoard();
+                    modalOpen = FrontierFarmUI.IsAnyModalOpen || FrontierGuildUI.IsAnyModalOpen;
                 }
                 else if (loop.State == RunState.Running && !loop.DialogueOpen && !modalOpen && (kb.eKey.wasPressedThisFrame || kb.spaceKey.wasPressedThisFrame))
                 {
@@ -167,7 +182,7 @@ namespace ProjectFrontier
         private void FixedUpdate()
         {
             var loop = FrontierGameLoop.Instance;
-            if (loop == null || loop.State != RunState.Running || loop.DialogueOpen || FrontierFarmUI.IsAnyModalOpen) return;
+            if (loop == null || loop.State != RunState.Running || loop.DialogueOpen || FrontierFarmUI.IsAnyModalOpen || FrontierGuildUI.IsAnyModalOpen) return;
 
             Vector2 nextPos = _rb.position + _currentVelocity * Time.fixedDeltaTime;
             nextPos.x = Mathf.Clamp(nextPos.x, worldBoundsMin.x, worldBoundsMax.x);
