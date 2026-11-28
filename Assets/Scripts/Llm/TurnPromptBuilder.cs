@@ -55,6 +55,8 @@ namespace ProjectFrontier.Llm
             public string NowLine;
             public string StandingLine;
             public string RumorLine;
+            /// <summary>Top recalled long-term memories (#42), already rendered and capped at ~90 tokens. Optional.</summary>
+            public string MemoryBlock;
             public int Day = 1;
             public IReadOnlyList<ChatMessage> History;
             public string PlayerMessage;
@@ -156,6 +158,7 @@ namespace ProjectFrontier.Llm
                 }
                 sb.Append('\n');
             }
+            if (!string.IsNullOrWhiteSpace(ctx.MemoryBlock)) sb.Append(ctx.MemoryBlock.TrimEnd()).Append('\n');
             sb.Append(OutputRules);
             return sb.ToString();
         }

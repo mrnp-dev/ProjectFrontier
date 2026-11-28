@@ -76,7 +76,13 @@ namespace ProjectFrontier.Llm
                     }
                     catch (Exception e)
                     {
-                        fallbackReason = e.Message;
+                        fallbackReason = ClassifyFailure(e.Message);
+                        if (IsTpdCap(fallbackReason))
+                        {
+                            TpdCapTurns++;
+                            if (TpdCapTurns == 1)
+                                UnityEngine.Debug.LogWarning("[LLM] Provider daily token cap (TPD) reached: NPC turns use offline lines until it resets.");
+                        }
                     }
                 }
             }
@@ -108,6 +114,27 @@ namespace ProjectFrontier.Llm
             TurnCompleted?.Invoke(result);
             return result;
         }
+
+        /// <summary>Prefix on fallback reasons caused by the provider's tokens-per-day cap (Groq free tier HTTP 429 TPD).</summary>
+        public const string TpdCapTag = "tpd_cap";
+
+        /// <summary>Turns that fell back to offline because the provider's daily token cap was hit.</summary>
+        public int TpdCapTurns { get; private set; }
+
+        /// <summary>
+        /// Tags a provider error so logs can tell the daily token cap apart from a real failure, e.g.
+        /// <c>tpd_cap: HTTP 429 ... tokens per day (TPD) ...</c>. Other messages are returned unchanged.
+        /// </summary>
+        public static string ClassifyFailure(string message)
+        {
+            if (string.IsNullOrEmpty(message)) return message;
+            bool tpd = message.IndexOf("tokens per day", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                       message.IndexOf("(TPD)", StringComparison.Ordinal) >= 0;
+            return tpd ? TpdCapTag + ": " + message : message;
+        }
+
+        public static bool IsTpdCap(string reason) =>
+            reason != null && reason.StartsWith(TpdCapTag, StringComparison.Ordinal);
 
         /// <summary>A retry is only attempted when at least this much of the turn budget is left.</summary>
         public const float MinRetrySeconds = 1.5f;

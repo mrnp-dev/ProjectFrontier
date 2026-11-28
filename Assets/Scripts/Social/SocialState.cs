@@ -100,7 +100,8 @@ namespace ProjectFrontier.Social
     /// </summary>
     public sealed class SocialState
     {
-        public const int CurrentSaveVersion = 1;
+        /// <summary>2: adds long-term NPC memories (#42). Version 1 saves load with no memories.</summary>
+        public const int CurrentSaveVersion = 2;
 
         private readonly Dictionary<string, Relationship> _relationships = new Dictionary<string, Relationship>();
         private readonly List<Rumor> _rumors = new List<Rumor>();
@@ -110,6 +111,9 @@ namespace ProjectFrontier.Social
         public const int MaxRumorsPerHolder = 4;
 
         public int Day { get; private set; } = 1;
+
+        /// <summary>Long-term NPC memories (#42). Saved with the social snapshot, so local + Cloud Save cover it.</summary>
+        public NpcMemoryStore Memory { get; } = new NpcMemoryStore();
 
         /// <summary>Last day an evening gossip exchange ran (prevents double exchanges after reload).</summary>
         public int LastGossipDay { get; private set; }
@@ -152,6 +156,7 @@ namespace ProjectFrontier.Social
         {
             Day++;
             _rumors.RemoveAll(r => r.expiresDay < Day);
+            Memory.Consolidate(Day);
         }
 
         public void AddRumor(Rumor rumor)
@@ -209,6 +214,7 @@ namespace ProjectFrontier.Social
             }
             data.metNpcIds.AddRange(_met);
             foreach (var r in _rumors) data.rumors.Add(r.Clone());
+            data.memories = Memory.ToSaveList();
             return data;
         }
 
@@ -218,6 +224,7 @@ namespace ProjectFrontier.Social
             _relationships.Clear();
             _rumors.Clear();
             _met.Clear();
+            Memory.Clear();
             Day = 1;
             LastGossipDay = 0;
             if (data == null) return;
@@ -243,6 +250,7 @@ namespace ProjectFrontier.Social
                     if (r != null && r.expiresDay >= Day) AddRumor(r.Clone());
                 }
             }
+            Memory.LoadFrom(data.memories);
         }
     }
 
@@ -267,6 +275,7 @@ namespace ProjectFrontier.Social
         public List<RelationshipRecord> relationships = new List<RelationshipRecord>();
         public List<string> metNpcIds = new List<string>();
         public List<Rumor> rumors = new List<Rumor>();
+        public List<MemoryFact> memories = new List<MemoryFact>();
 
         /// <summary>Cloud vs local reconcile: the most recently saved snapshot wins; null loses.</summary>
         public static SocialSaveData PickNewest(SocialSaveData a, SocialSaveData b)

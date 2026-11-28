@@ -150,6 +150,9 @@ namespace ProjectFrontier
 
             _transfers.Clear();
             int count = GossipEngine.RunExchange(State, GossipTrust, _groupList, _transfers);
+            // #42: listeners remember what they heard, and villagers pass on what the player told them (0 tokens).
+            List<MemoryFact> shared = NpcMemoryGossip.Share(State.Memory, GossipTrust, _groupList, _transfers, State.Day, DisplayNameOf);
+            foreach (MemoryFact m in shared) Debug.Log($"[Memory] Day {State.Day}: {m.holderId} learned from {m.fromId}: \"{m.text}\"");
             _dirty = true;
             SaveNow(forceCloud: false);
 
@@ -166,6 +169,34 @@ namespace ProjectFrontier
 
             GossipExchanged?.Invoke(_transfers);
             return count;
+        }
+
+        // ------------------------------------------------------------------ long-term memory (#42)
+
+        /// <summary>Stores facts extracted from a finished conversation and persists them (local now, cloud throttled).</summary>
+        public int RetainMemories(IReadOnlyList<MemoryFact> facts)
+        {
+            if (facts == null || facts.Count == 0) return 0;
+            int n = 0;
+            foreach (MemoryFact f in facts)
+            {
+                MemoryFact stored = State.Memory.Retain(f);
+                if (stored == null) continue;
+                n++;
+                Debug.Log($"[Memory] {stored.holderId} remembers (day {stored.day}, importance {stored.importance}): \"{stored.text}\"");
+            }
+            if (n > 0) { _dirty = true; SaveNow(forceCloud: false); }
+            return n;
+        }
+
+        public List<MemoryFact> RecallMemories(string npcId, string playerMessage, int count = NpcMemoryStore.DefaultRecallCount) =>
+            State.Memory.Recall(npcId, playerMessage, State.Day, count);
+
+        private static string DisplayNameOf(string npcId)
+        {
+            foreach (var npc in VillageNpc.AllNpcs)
+                if (npc != null && npc.NpcId == npcId) return npc.DisplayName;
+            return null;
         }
 
         public string GetGossipGreeting(string npcId, Func<string, string> nameOf) =>
