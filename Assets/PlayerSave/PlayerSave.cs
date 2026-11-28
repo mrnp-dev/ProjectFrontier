@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using Unity.Services.CloudSave;
 using Unity.Services.CloudSave.Models;
+using ProjectFrontier.Net;
+using Unity.Services.Core;
 using UnityEngine;
 
 // Added by `unity projects create`. One Cloud Save slot for the signed-in
@@ -29,10 +31,12 @@ public static class PlayerSave
             }
             await CloudSaveService.Instance.Data.Player.SaveAsync(
                 new Dictionary<string, object> { { key, data } });
+            ConnectionReports.Success(ConnectionSource.CloudSave);
             return true;
         }
         catch (Exception e)
         {
+            ReportFailure(e);
             Debug.LogWarning($"Cloud Save failed: {e.Message}");
             return false;
         }
@@ -53,10 +57,12 @@ public static class PlayerSave
             }
             var items = await CloudSaveService.Instance.Data.Player.LoadAsync(
                 new HashSet<string> { key });
+            ConnectionReports.Success(ConnectionSource.CloudSave);
             return items.TryGetValue(key, out Item item) ? item.Value.GetAs<T>() : fallback;
         }
         catch (Exception e)
         {
+            ReportFailure(e);
             Debug.LogWarning($"Cloud Save load failed: {e.Message}");
             return fallback;
         }
@@ -75,14 +81,29 @@ public static class PlayerSave
             }
             var items = await CloudSaveService.Instance.Data.Player.LoadAsync(
                 new HashSet<string> { key });
+            ConnectionReports.Success(ConnectionSource.CloudSave);
             return items.TryGetValue(key, out Item item)
                 ? (true, true, item.Value.GetAs<T>())
                 : (true, false, default);
         }
         catch (Exception e)
         {
+            ReportFailure(e);
             Debug.LogWarning($"Cloud Save load failed: {e.Message}");
             return (false, false, default);
         }
+    }
+
+    // Online-only (#37): tells the connection monitor whether Cloud Save could
+    // be reached. Errors with a server answer (validation, conflicts) still
+    // count as reachable; only transport errors, timeouts and outages don't.
+    static void ReportFailure(Exception e) =>
+        ConnectionReports.Outcome(ConnectionSource.CloudSave, !IsConnectionError(e), e.Message);
+
+    public static bool IsConnectionError(Exception e)
+    {
+        if (e is CloudSaveException c && c.Reason == CloudSaveExceptionReason.NoInternetConnection) return true;
+        return e is RequestFailedException r && (r.ErrorCode == CommonErrorCodes.TransportError
+            || r.ErrorCode == CommonErrorCodes.Timeout || r.ErrorCode == CommonErrorCodes.ServiceUnavailable);
     }
 }

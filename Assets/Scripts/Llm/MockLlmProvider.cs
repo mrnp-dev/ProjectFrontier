@@ -7,16 +7,18 @@ using UnityEngine;
 namespace ProjectFrontier.Llm
 {
     /// <summary>
-    /// Offline, deterministic provider: keyword sentiment drives mood and small deltas, and the reply
+    /// Built-in, deterministic lines: keyword sentiment drives mood and small deltas, and the reply
     /// is returned as the same compact JSON a real model sends, so the parser path is always exercised.
-    /// Used for offline play, automated tests and as the fallback when the network provider fails.
+    /// The game is online-only (#37): this is the short-drop cushion when a call fails, and the provider for
+    /// automated tests and dev machines without a key. It is not an offline play mode.
     /// </summary>
     public sealed class MockLlmProvider : ILLMProvider
     {
-        public string Name => "offline";
+        public const string ProviderName = "built-in";
+        public string Name => ProviderName;
         public bool RequiresNetwork => false;
 
-        /// <summary>Optional fake latency so the UI's waiting state is visible in offline play.</summary>
+        /// <summary>Optional fake latency so the UI's waiting state is visible when no AI key is configured.</summary>
         public int SimulatedLatencyMs;
 
         private static readonly string[] Positive =

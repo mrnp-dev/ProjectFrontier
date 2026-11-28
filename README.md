@@ -13,6 +13,7 @@ Its core hook is a small, tightly connected frontier village powered by **LLM-dr
 | **Foundation (`cdaaef1`)** | Done | Unity `6000.3.29f1` URP 2D baseline, `480x270 @ 16 PPU`, Low/Medium/High URP 2D assets, Cinemachine `3.1.8`, UGS packages, Android IL2CPP ARM64 config. |
 | **Milestone 1 (`c0f4cfb`)** | Done | Playable Oakhaven village technical-floor harness: touch joystick + keyboard movement, 2 starter NPCs, 5 lantern shard pickups, 90s dusk loop, native-res uGUI shell, procedural audio & feel, runtime graphics presets, UGS fallback wiring, and verified 44 MB Android release APK (`Builds/Android/ProjectFrontier.apk`). |
 | **Milestone 2 (Core Slice)** | Planned | 5 connected frontier NPCs (Bram, Mira, Aldric, Lyra, Pip), hybrid LLM chatbox (free-text + quick-reply chips), deterministic C# gossip/trust engine, and daily NPC schedules. |
+| **Online-only (#37)** | Done | The game requires the internet: startup gate with Retry, quiet short-drop retries with built-in NPC lines, and a "Reconnecting..." pause after ~12 s that resumes automatically. No offline play mode. |
 | **Milestone 3+ (Full Loop)** | Planned | Farmstead & crafting, 3-floor dungeon biome + mini-boss, Adventurers Guild quests, pets, and Day 5 town raid climax. |
 
 ---
@@ -38,7 +39,9 @@ Its core hook is a small, tightly connected frontier village powered by **LLM-dr
    ```text
    ProjectFrontier -> Rebuild Milestone 1 Village Scene
    ```
-4. Press **Play** to test the Oakhaven village loop.
+4. Press **Play** to test the Oakhaven village loop. An internet connection is required (online-only, #37): without it the
+   game stops at "Connect to the internet to play". Real villager AI needs an endpoint and key in `.env`
+   ([`docs/LLM_SETUP.md`](docs/LLM_SETUP.md)); without one, villagers use built-in lines.
 
 ### Controls (Milestone 1)
 - **Touch / Mobile:** On-screen virtual thumbstick (`VirtualJoystickUI`) + context **TALK** button + top-right **GFX** / **PAUSE** buttons.
@@ -79,6 +82,7 @@ ProjectFrontier/
 │   │   ├── Editor/               # FrontierSceneBuilder menu builder
 │   │   ├── Gameplay/             # FrontierGameLoop, PlayerController2D, CharacterMotion2D, VillageNpc, LanternShardPickup
 │   │   ├── Live/                 # FrontierLiveManager (Auth, Save, RemoteConfig, Leaderboards)
+│   │   ├── Net/                  # ConnectionMonitor: online-only state machine + ConnectionReports (#37)
 │   │   └── UI/                   # FrontierShellUI, VirtualJoystickUI
 │   └── Settings/Graphics/        # URP2D_{Low,Medium,High} & Renderer2D_{Low,Medium,High} assets
 ├── docs/

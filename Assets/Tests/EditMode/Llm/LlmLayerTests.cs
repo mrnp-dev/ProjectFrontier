@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using NUnit.Framework;
+using ProjectFrontier.Net;
 using ProjectFrontier.Social;
 using UnityEngine;
 using UnityEngine.TestTools;
@@ -302,7 +303,7 @@ namespace ProjectFrontier.Llm.Tests
             yield return Await(svc.RunTurnAsync(Request("thank you")), r => res = r);
 
             Assert.IsTrue(res.UsedFallbackProvider);
-            Assert.AreEqual("offline", res.ProviderName);
+            Assert.AreEqual(MockLlmProvider.ProviderName, res.ProviderName);
             StringAssert.Contains("401", res.FallbackReason);
             Assert.IsTrue(res.ParsedJson);
             Assert.IsTrue(res.UsageEstimated);
@@ -350,7 +351,7 @@ namespace ProjectFrontier.Llm.Tests
 
             Assert.AreEqual(2, fake.Calls, "exactly one retry");
             Assert.IsTrue(res.UsedFallbackProvider);
-            Assert.AreEqual("offline", res.ProviderName);
+            Assert.AreEqual(MockLlmProvider.ProviderName, res.ProviderName);
         }
 
         [Test]
@@ -406,6 +407,113 @@ namespace ProjectFrontier.Llm.Tests
             Assert.IsFalse(string.IsNullOrEmpty(res.Dialogue));
         }
 
+        private sealed class RecordingSink : IConnectionSink
+        {
+            public readonly List<string> Events = new List<string>();
+            public void ReportSuccess(ConnectionSource source) => Events.Add("ok:" + source);
+            public void ReportFailure(ConnectionSource source, string reason) => Events.Add("fail:" + source);
+        }
+
+        [UnityTest]
+        public IEnumerator NetworkBlipIsRetriedOnceAndReported()
+        {
+            var sink = new RecordingSink();
+            ConnectionReports.Sink = sink;
+            try
+            {
+                int n = 0;
+                var fake = new FakeProvider
+                {
+                    Impl = (r, ct) => ++n == 1
+                        ? Task.FromException<LlmCompletion>(new LlmProviderException("HTTP 0 Cannot connect to destination host", false, true))
+                        : Task.FromResult(new LlmCompletion { Text = "{\"dialogue\":\"Back again.\"}", PromptTokens = 300, CompletionTokens = 5 })
+                };
+                var svc = new LlmTurnService(fake, new MockLlmProvider(), 5f, () => true, _ => { });
+                LlmTurnResult res = null;
+                yield return Await(svc.RunTurnAsync(Request()), r => res = r);
+
+                Assert.AreEqual(2, fake.Calls, "one quiet retry after a blip");
+                Assert.AreEqual(1, svc.TransportRetries);
+                Assert.IsFalse(res.UsedFallbackProvider);
+                Assert.AreEqual("Back again.", res.Dialogue);
+                CollectionAssert.AreEqual(new[] { "fail:Llm", "ok:Llm" }, sink.Events);
+            }
+            finally { ConnectionReports.Sink = null; }
+        }
+
+        [UnityTest]
+        public IEnumerator PersistentDropFallsBackToBuiltInLineAndReportsFailure()
+        {
+            var sink = new RecordingSink();
+            ConnectionReports.Sink = sink;
+            try
+            {
+                var fake = new FakeProvider
+                {
+                    Impl = (r, ct) => Task.FromException<LlmCompletion>(new LlmProviderException("HTTP 0 no route", false, true))
+                };
+                var svc = new LlmTurnService(fake, new MockLlmProvider(), 5f, () => true, _ => { });
+                LlmTurnResult res = null;
+                yield return Await(svc.RunTurnAsync(Request("Hello there")), r => res = r);
+
+                Assert.AreEqual(2, fake.Calls);
+                Assert.IsTrue(res.UsedFallbackProvider);
+                Assert.AreEqual(MockLlmProvider.ProviderName, res.ProviderName);
+                Assert.IsFalse(string.IsNullOrEmpty(res.Dialogue), "the built-in line keeps the conversation going");
+                CollectionAssert.AreEqual(new[] { "fail:Llm", "fail:Llm" }, sink.Events);
+            }
+            finally { ConnectionReports.Sink = null; }
+        }
+
+        [UnityTest]
+        public IEnumerator HttpErrorStillCountsAsConnected()
+        {
+            var sink = new RecordingSink();
+            ConnectionReports.Sink = sink;
+            try
+            {
+                var fake = new FakeProvider
+                {
+                    Impl = (r, ct) => Task.FromException<LlmCompletion>(new LlmProviderException("HTTP 429 Too Many Requests: tokens per day (TPD)"))
+                };
+                var svc = new LlmTurnService(fake, new MockLlmProvider(), 5f, () => true, _ => { });
+                LlmTurnResult res = null;
+                yield return Await(svc.RunTurnAsync(Request()), r => res = r);
+
+                Assert.AreEqual(1, fake.Calls, "quota errors are not retried");
+                Assert.IsTrue(LlmTurnService.IsTpdCap(res.FallbackReason));
+                CollectionAssert.AreEqual(new[] { "ok:Llm" }, sink.Events, "a 429 proves the network works");
+            }
+            finally { ConnectionReports.Sink = null; }
+        }
+
+        [UnityTest]
+        public IEnumerator TimeoutReportsAConnectionFailure()
+        {
+            var sink = new RecordingSink();
+            ConnectionReports.Sink = sink;
+            try
+            {
+                var fake = new FakeProvider { Impl = (r, ct) => Task.Run(async () => { await Task.Delay(Timeout.Infinite, ct); return (LlmCompletion)null; }) };
+                var svc = new LlmTurnService(fake, new MockLlmProvider(), 0.3f, () => true, _ => { });
+                LlmTurnResult res = null;
+                yield return Await(svc.RunTurnAsync(Request()), r => res = r);
+
+                StringAssert.StartsWith("timeout", res.FallbackReason);
+                CollectionAssert.AreEqual(new[] { "fail:Llm" }, sink.Events);
+            }
+            finally { ConnectionReports.Sink = null; }
+        }
+
+        [Test]
+        public void TransportClassification()
+        {
+            Assert.IsTrue(LlmTurnService.IsTransport(new TimeoutException()));
+            Assert.IsTrue(LlmTurnService.IsTransport(new LlmProviderException("HTTP 0", false, true)));
+            Assert.IsFalse(LlmTurnService.IsTransport(new LlmProviderException("HTTP 401 Unauthorized")));
+            Assert.IsFalse(LlmTurnService.IsTransport(new InvalidOperationException()));
+        }
+
         [UnityTest]
         public IEnumerator SkipsNetworkProviderWhenOffline()
         {
@@ -414,9 +522,9 @@ namespace ProjectFrontier.Llm.Tests
             LlmTurnResult res = null;
             yield return Await(svc.RunTurnAsync(Request()), r => res = r);
 
-            Assert.AreEqual(0, fake.Calls);
-            Assert.AreEqual("offline", res.FallbackReason);
-            Assert.AreEqual("offline", res.ProviderName);
+            Assert.AreEqual(0, fake.Calls, "no connection: answer from built-in lines without waiting for a timeout");
+            Assert.AreEqual(LlmTurnService.NoConnectionReason, res.FallbackReason);
+            Assert.AreEqual(MockLlmProvider.ProviderName, res.ProviderName);
         }
 
         [UnityTest]
@@ -447,8 +555,10 @@ namespace ProjectFrontier.Llm.Tests
         [Test]
         public void DefaultsToOfflineAndNeverLogsKey()
         {
-            Assert.AreEqual(LlmMode.Offline, new LlmEndpointConfig().Mode);
-            Assert.AreEqual(LlmMode.Offline, new LlmEndpointConfig { mode = "nonsense" }.Mode);
+            Assert.AreEqual(LlmMode.BuiltIn, new LlmEndpointConfig().Mode);
+            Assert.AreEqual(LlmMode.BuiltIn, new LlmEndpointConfig { mode = "nonsense" }.Mode);
+            Assert.AreEqual(LlmMode.BuiltIn, new LlmEndpointConfig { mode = "Offline" }.Mode, "retired value from old configs");
+            Assert.AreEqual(LlmMode.BuiltIn, new LlmEndpointConfig { mode = "7" }.Mode, "numeric out of range");
             var cfg = new LlmEndpointConfig { mode = "directdev", apiKey = "sk-secret-123" };
             Assert.AreEqual(LlmMode.DirectDev, cfg.Mode);
             StringAssert.DoesNotContain("sk-secret", cfg.ToString());

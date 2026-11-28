@@ -112,6 +112,8 @@ namespace ProjectFrontier
             if (loop != null && loop.State != RunState.Running) return;
 
             bool blockedByDialogue = pauseDuringDialogue && ((loop != null && loop.DialogueOpen) || FrontierFarmUI.IsAnyModalOpen);
+            // Online-only (#37): "Reconnecting..." stops the day (timeScale is 0 too; this keeps it explicit).
+            if (loop != null && loop.ConnectionHold) blockedByDialogue = true;
             if (!blockedByDialogue && !IsSleeping)
             {
                 _clock.Tick(Time.deltaTime);

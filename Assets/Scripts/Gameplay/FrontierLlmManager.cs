@@ -32,7 +32,7 @@ namespace ProjectFrontier
         public LlmTurnService Service { get; private set; }
         public LlmEndpointConfig Config { get; private set; }
         public bool IsOnlineProvider => Service != null && Service.Primary != Service.Offline;
-        public string ProviderLabel => Service?.Primary.Name ?? "offline";
+        public string ProviderLabel => Service?.Primary.Name ?? MockLlmProvider.ProviderName;
 
         public event Action<LlmTurnResult> TurnCompleted;
 
@@ -97,13 +97,13 @@ namespace ProjectFrontier
                 case LlmMode.DirectDev:
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
                     if (!Config.HasEndpoint)
-                        Debug.LogWarning("[LLM] DirectDev needs FRONTIER_LLM_BASE_URL; using offline replies.");
+                        Debug.LogWarning("[LLM] DirectDev needs FRONTIER_LLM_BASE_URL; using built-in lines.");
                     else if (string.IsNullOrWhiteSpace(Config.apiKey) && !Config.IsLocalEndpoint)
-                        Debug.LogWarning("[LLM] DirectDev needs FRONTIER_LLM_API_KEY for a remote endpoint; using offline replies.");
+                        Debug.LogWarning("[LLM] DirectDev needs FRONTIER_LLM_API_KEY for a remote endpoint; using built-in lines.");
                     else
                         primary = new OpenAiCompatibleProvider(Config, () => Config.apiKey);
 #else
-                    Debug.LogWarning("[LLM] DirectDev mode is disabled in release builds; using offline replies.");
+                    Debug.LogWarning("[LLM] DirectDev mode is disabled in release builds; using built-in lines.");
 #endif
                     break;
                 case LlmMode.Proxy:
@@ -113,8 +113,8 @@ namespace ProjectFrontier
             }
 
             _builder.MaxOutputTokens = Mathf.Clamp(Config.maxTokens, 32, TurnPromptBuilder.DefaultMaxOutputTokens);
-            Service = new LlmTurnService(primary, offline, Config.timeoutSeconds,
-                () => Application.internetReachability != NetworkReachability.NotReachable);
+            // Online-only (#37): the connection monitor decides when to skip the network and answer from built-in lines.
+            Service = new LlmTurnService(primary, offline, Config.timeoutSeconds, () => FrontierConnectionManager.AllowsNetworkCalls);
             Debug.Log($"[LLM] Provider: {primary.Name} ({Config})");
         }
 
@@ -193,7 +193,7 @@ namespace ProjectFrontier
         }
 
         /// <summary>
-        /// Runs one player -> NPC turn. Always returns a playable reply (offline fallback on any provider failure),
+        /// Runs one player -> NPC turn. Always returns a playable reply (built-in line on any provider failure, #37),
         /// or null if a turn for this villager is already in flight or the manager was destroyed.
         /// </summary>
         public async Task<LlmTurnResult> SendPlayerMessageAsync(NpcPersona persona, string playerText)

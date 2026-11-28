@@ -2,7 +2,8 @@
     "name": "PlayerAuthentication",
     "references": [
         "Unity.Services.Core",
-        "Unity.Services.Authentication"
+        "Unity.Services.Authentication",
+        "ProjectFrontier.Net"
     ],
     "autoReferenced": true
 }

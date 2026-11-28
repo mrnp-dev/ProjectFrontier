@@ -132,7 +132,7 @@ namespace ProjectFrontier.Llm.Tests
             yield return Await(MemoryExtractor.RunAsync(new MockLlmProvider(), MemoryExtractor.BuildRequest("mira", "Mira", Chat()), 1, 5f, CancellationToken.None), r => res = r);
             Assert.AreEqual(0, res.Facts.Count);
             Assert.IsFalse(res.CalledProvider);
-            Assert.AreEqual("offline provider", res.Error);
+            Assert.AreEqual("no AI provider", res.Error);
         }
 
         [UnityTest]

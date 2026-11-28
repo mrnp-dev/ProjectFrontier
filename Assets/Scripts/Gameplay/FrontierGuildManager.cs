@@ -174,7 +174,7 @@ namespace ProjectFrontier
         {
             if (State == null)
             {
-                message = "GUILD OFFLINE";
+                message = "GUILD NOT READY";
                 return false;
             }
 
@@ -197,7 +197,7 @@ namespace ProjectFrontier
         {
             if (State == null)
             {
-                result = new BountyTurnInResult(false, bountyId, 0, 0, GuildRank.Bronze, GuildRank.Bronze, "GUILD OFFLINE");
+                result = new BountyTurnInResult(false, bountyId, 0, 0, GuildRank.Bronze, GuildRank.Bronze, "GUILD NOT READY");
                 return false;
             }
 
@@ -239,7 +239,7 @@ namespace ProjectFrontier
         {
             if (State == null)
             {
-                message = "GUILD OFFLINE";
+                message = "GUILD NOT READY";
                 return false;
             }
 
@@ -291,7 +291,7 @@ namespace ProjectFrontier
 
         /// <summary>
         /// Non-blocking Layer 2 LLM flavor refresh for the current day's posted bounties.
-        /// Uses cached values when present and falls back silently to static copy when offline or on error.
+        /// Uses cached values when present and falls back silently to static copy on a connection drop or error.
         /// </summary>
         public async Task RefreshBoardFlavorAsync(BountyFlavorService customService = null)
         {
@@ -363,7 +363,7 @@ namespace ProjectFrontier
             if (primary == null || !primary.RequiresNetwork) return null;
             return new BountyFlavorService(
                 primary,
-                () => Application.internetReachability != NetworkReachability.NotReachable,
+                () => FrontierConnectionManager.AllowsNetworkCalls,
                 BountyFlavorService.DefaultTimeoutSeconds);
         }
 

@@ -1,5 +1,6 @@
 using System;
 using System.Threading.Tasks;
+using ProjectFrontier.Net;
 using Unity.Services.Authentication;
 using Unity.Services.Core;
 using UnityEngine;
@@ -31,6 +32,20 @@ public static class PlayerAuthentication
         pending.TrySetResult(await SignInAsync());
     }
 
+    // Online-only (#37): the startup gate's Retry button signs in again when
+    // the first attempt failed (e.g. the game was launched in airplane mode).
+    // Returns the existing result when already signed in.
+    public static async Task<bool> RetrySignInAsync()
+    {
+        var current = signedIn;
+        if (current.Task.IsCompleted && current.Task.Result) return true;
+        if (!current.Task.IsCompleted) return await current.Task;
+        var retry = new TaskCompletionSource<bool>();
+        signedIn = retry;
+        retry.TrySetResult(await SignInAsync());
+        return await retry.Task;
+    }
+
     static async Task<bool> SignInAsync()
     {
         try
@@ -46,12 +61,14 @@ public static class PlayerAuthentication
                 await AuthenticationService.Instance.SignInAnonymouslyAsync();
             }
             Debug.Log($"Signed in anonymously as player {AuthenticationService.Instance.PlayerId}");
+            ConnectionReports.Success(ConnectionSource.Auth);
             return true;
         }
         catch (Exception e)
         {
-            // The game keeps running offline; services that need a player
-            // ID stay unavailable until the next start.
+            // Online-only (#37): the startup gate shows the retry screen and
+            // calls RetrySignInAsync.
+            ConnectionReports.Failure(ConnectionSource.Auth, e.Message);
             Debug.LogWarning($"Anonymous sign-in failed: {e.Message}");
             return false;
         }

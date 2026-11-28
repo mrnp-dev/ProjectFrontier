@@ -7,8 +7,12 @@ namespace ProjectFrontier.Llm
 {
     public enum LlmMode
     {
-        /// <summary>Offline provider only. Default for release builds until the proxy ships.</summary>
-        Offline,
+        /// <summary>
+        /// Built-in lines only, no AI calls: automated tests and machines without a key. Not an offline play mode: the
+        /// game is online-only (#37) and still requires internet + sign-in at startup. Old configs saying "Offline"
+        /// read as this.
+        /// </summary>
+        BuiltIn,
         /// <summary>Call a model endpoint directly with a dev key. Editor and development builds only.</summary>
         DirectDev,
         /// <summary>Call the game's backend proxy with the player's UGS access token; the proxy holds the API key.</summary>
@@ -24,7 +28,7 @@ namespace ProjectFrontier.Llm
     [Serializable]
     public class LlmEndpointConfig
     {
-        public string mode = nameof(LlmMode.Offline);
+        public string mode = nameof(LlmMode.BuiltIn);
         public string baseUrl = "";
         public string model = "";
         public string apiKey = "";
@@ -36,6 +40,7 @@ namespace ProjectFrontier.Llm
         /// <summary>OpenAI-style repetition penalties (#41). 0 = not sent, for providers that reject them.</summary>
         public float frequencyPenalty = 0.3f;
         public float presencePenalty = 0.2f;
+        /// <summary>Fake latency of built-in lines when no AI is configured (JSON key kept for old configs).</summary>
         public int offlineLatencyMs = 400;
         /// <summary>Optional "low" / "medium" / "high" for reasoning models (gpt-oss, o-series). Empty = not sent.</summary>
         public string reasoningEffort = "";
@@ -54,7 +59,8 @@ namespace ProjectFrontier.Llm
         public int EffectiveMaxTokens(int outputTokens) =>
             HasReasoningEffort ? outputTokens + Math.Max(0, reasoningTokenAllowance) : outputTokens;
 
-        public LlmMode Mode => Enum.TryParse(mode, true, out LlmMode m) ? m : LlmMode.Offline;
+        /// <summary>Unknown values and the retired "Offline" value read as <see cref="LlmMode.BuiltIn"/>.</summary>
+        public LlmMode Mode => Enum.TryParse(mode, true, out LlmMode m) && Enum.IsDefined(typeof(LlmMode), m) ? m : LlmMode.BuiltIn;
 
         /// <summary>baseUrl may be ".../v1" or the full ".../chat/completions" URL.</summary>
         public string ChatCompletionsUrl

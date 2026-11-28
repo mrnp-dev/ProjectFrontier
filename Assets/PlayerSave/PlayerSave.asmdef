@@ -3,7 +3,8 @@
     "references": [
         "Unity.Services.Core",
         "Unity.Services.CloudSave",
-        "PlayerAuthentication"
+        "PlayerAuthentication",
+        "ProjectFrontier.Net"
     ],
     "autoReferenced": true
 }

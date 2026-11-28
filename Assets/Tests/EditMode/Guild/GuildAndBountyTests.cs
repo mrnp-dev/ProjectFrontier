@@ -287,7 +287,7 @@ namespace ProjectFrontier.Guild.Tests
             var svc = new BountyFlavorService(provider, () => false, 2f);
             BountyFlavorResult res = svc.GenerateFlavorAsync(def, 1, GuildRank.Bronze).GetAwaiter().GetResult();
             Assert.IsTrue(res.UsedFallback);
-            Assert.AreEqual("no network", res.FallbackReason);
+            Assert.AreEqual("no connection", res.FallbackReason);
             Assert.AreEqual(def.StaticDescription, res.Text);
             Assert.AreEqual(0, calls);
         }
