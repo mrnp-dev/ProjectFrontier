@@ -1,5 +1,6 @@
 #if UNITY_EDITOR
 using System.IO;
+using ProjectFrontier.Farm;
 using TMPro;
 using Unity.Cinemachine;
 using UnityEditor;
@@ -38,9 +39,22 @@ namespace ProjectFrontier.Editor
         private static readonly Vector3 PipStallSpot = new Vector3(2.9f, -4.1f, 0f);
         private static readonly Vector3 LyraSquareSpot = new Vector3(1.6f, 1.6f, 0f);
 
+        // West Homestead zone (#19): player cabin, crafting bench, rest post, and 8x4 chunked crop plots.
+        private static readonly Vector3 HomesteadCottagePos = new Vector3(-18.5f, 4.2f, 0f);
+        private static readonly Vector3 CraftingBenchPos = new Vector3(-15.2f, 2.1f, 0f);
+        private static readonly Vector3 RestPostPos = new Vector3(-21.2f, 2.1f, 0f);
+
         private struct HomeSpotSprites
         {
             public Sprite forge, tavern, guildHall, anvil, barrel, questBoard, herbStall;
+        }
+
+        private struct FarmSprites
+        {
+            public Sprite soilUntilled, soilTilled, soilWatered;
+            public Sprite cropStage1, cropStage2, cropStage3;
+            public Sprite cropMoonmintMature, cropSunpetalMature, cropEmberrootMature;
+            public Sprite plotCursor, craftingBench, restPost;
         }
 
         [MenuItem("ProjectFrontier/Rebuild Milestone 1 Village Scene")]
@@ -87,6 +101,21 @@ namespace ProjectFrontier.Editor
             Sprite lanternPost = SaveSpriteAsset("prop_lanternpost", PixelArtFactory.GetLanternPostSprite());
             Sprite hearth = SaveSpriteAsset("prop_hearth", PixelArtFactory.GetHearthBrazierSprite());
             Sprite fence = SaveSpriteAsset("prop_fence", PixelArtFactory.GetFenceSprite());
+            var farmSprites = new FarmSprites
+            {
+                soilUntilled = SaveSpriteAsset("tile_soil_untilled", PixelArtFactory.GetSoilTileSprite(0)),
+                soilTilled = SaveSpriteAsset("tile_soil_tilled", PixelArtFactory.GetSoilTileSprite(1)),
+                soilWatered = SaveSpriteAsset("tile_soil_watered", PixelArtFactory.GetSoilTileSprite(2)),
+                cropStage1 = SaveSpriteAsset("crop_stage_1", PixelArtFactory.GetCropStageSprite(1)),
+                cropStage2 = SaveSpriteAsset("crop_stage_2", PixelArtFactory.GetCropStageSprite(2)),
+                cropStage3 = SaveSpriteAsset("crop_stage_3", PixelArtFactory.GetCropStageSprite(3)),
+                cropMoonmintMature = SaveSpriteAsset("crop_mature_moonmint", PixelArtFactory.GetMatureCropSprite(ItemCatalog.CropMoonmint)),
+                cropSunpetalMature = SaveSpriteAsset("crop_mature_sunpetal", PixelArtFactory.GetMatureCropSprite(ItemCatalog.CropSunpetal)),
+                cropEmberrootMature = SaveSpriteAsset("crop_mature_emberroot", PixelArtFactory.GetMatureCropSprite(ItemCatalog.CropEmberroot)),
+                plotCursor = SaveSpriteAsset("ui_plot_cursor", PixelArtFactory.GetPlotCursorSprite()),
+                craftingBench = SaveSpriteAsset("prop_craftingbench", PixelArtFactory.GetCraftingBenchSprite()),
+                restPost = SaveSpriteAsset("prop_restpost", PixelArtFactory.GetRestPostSprite())
+            };
 
             Sprite uiSolid = SaveSpriteAsset("ui_solid", PixelArtFactory.GetSolidUiSprite());
             talkBubble = SaveSpriteAsset("ui_talk_bubble", PixelArtFactory.GetTalkBubbleSprite());
@@ -134,6 +163,7 @@ namespace ProjectFrontier.Editor
             managersGo.AddComponent<FrontierSocialManager>();
             managersGo.AddComponent<FrontierLlmManager>();
             managersGo.AddComponent<FrontierDayCycleManager>();
+            var farmMgr = managersGo.AddComponent<FrontierFarmManager>();
             var impulseSrc = managersGo.AddComponent<CinemachineImpulseSource>();
             feelMgr.impulseSource = impulseSrc;
 
@@ -144,10 +174,11 @@ namespace ProjectFrontier.Editor
             soGfx.FindProperty("highAsset").objectReferenceValue = AssetDatabase.LoadAssetAtPath<UniversalRenderPipelineAsset>("Assets/Settings/Graphics/URP2D_High.asset");
             soGfx.ApplyModifiedPropertiesWithoutUndo();
 
-            // Build Oakhaven Village World
+            // Build Oakhaven Village World + West Homestead (#19)
             var worldRoot = new GameObject("VillageWorld");
             BuildVillageGround(worldRoot.transform, new[] { grass0, grass1, grass2 }, new[] { dirt0, dirt1 }, cobble, spriteLitMat);
-            BuildVillageProps(worldRoot.transform, cottage, homeSprites, pine, lanternPost, hearth, fence, spriteLitMat);
+            BuildVillageProps(worldRoot.transform, cottage, homeSprites, pine, lanternPost, hearth, fence, spriteLitMat, spriteUnlitMat);
+            BuildHomesteadZone(worldRoot.transform, farmMgr, cottage, pine, fence, farmSprites, spriteLitMat, spriteUnlitMat);
 
             // Build Hero Player
             var playerGo = BuildCharacter("HeroPlayer", new Vector3(0f, -1.6f, 0f), heroBody, heroHead, foot, heroScarf, shadow, spriteLitMat, sortBase: 20);
@@ -243,19 +274,21 @@ namespace ProjectFrontier.Editor
             // One tiled renderer under the authored tiles so wide phones / camera edges never show void.
             var underlayGo = new GameObject("GrassUnderlay");
             underlayGo.transform.SetParent(groundRoot.transform, false);
-            underlayGo.transform.position = new Vector3(0f, 0f, 0.1f);
+            underlayGo.transform.position = new Vector3(-6f, 0f, 0.1f);
             var underlay = underlayGo.AddComponent<SpriteRenderer>();
             underlay.sprite = grass[0];
             underlay.sharedMaterial = mat;
             underlay.drawMode = SpriteDrawMode.Tiled;
             underlay.tileMode = SpriteTileMode.Continuous;
-            underlay.size = new Vector2(64f, 40f);
+            underlay.size = new Vector2(84f, 44f);
             underlay.sortingOrder = -101;
             for (int y = -9; y <= 9; y++)
-            for (int x = -15; x <= 15; x++)
+            for (int x = -26; x <= 15; x++)
             {
                 bool isPlaza = Mathf.Abs(x) <= 2 && Mathf.Abs(y) <= 2;
-                bool isCrossPath = (Mathf.Abs(x) <= 1 && y >= -7 && y <= 6) || (Mathf.Abs(y) <= 1 && x >= -10 && x <= 10);
+                bool isCrossPath = (Mathf.Abs(x) <= 1 && y >= -7 && y <= 6)
+                    || (Mathf.Abs(y) <= 1 && x >= -13 && x <= 10)
+                    || ((y == 1 || y == 2) && x >= -22 && x <= -13);
                 Sprite tile;
                 if (isPlaza) tile = cobble;
                 else if (isCrossPath) tile = dirt[Mathf.Abs(x * 7 + y * 13) % dirt.Length];
@@ -271,7 +304,7 @@ namespace ProjectFrontier.Editor
             }
         }
 
-        private static void BuildVillageProps(Transform parent, Sprite cottage, HomeSpotSprites home, Sprite pine, Sprite lanternPost, Sprite hearth, Sprite fence, Material mat)
+        private static void BuildVillageProps(Transform parent, Sprite cottage, HomeSpotSprites home, Sprite pine, Sprite lanternPost, Sprite hearth, Sprite fence, Material mat, Material unlitMat)
         {
             var propsRoot = new GameObject("VillageProps");
             propsRoot.transform.SetParent(parent, false);
@@ -293,7 +326,8 @@ namespace ProjectFrontier.Editor
             SpawnProp(propsRoot.transform, "Anvil", BramForgeSpot + new Vector3(-0.2f, -1.2f, 0f), home.anvil, mat, sortOrder: 13, addCollider: true);
 
             SpawnProp(propsRoot.transform, "Cottage_Pip", PipCottagePos, cottage, mat, sortOrder: 12, addCollider: true);
-            SpawnProp(propsRoot.transform, "HerbStall_Pip", HerbStallPos, home.herbStall, mat, sortOrder: 13, addCollider: true);
+            var herbStallGo = SpawnProp(propsRoot.transform, "HerbStall_Pip", HerbStallPos, home.herbStall, mat, sortOrder: 13, addCollider: true);
+            AttachStation(herbStallGo, HomesteadStationKind.PipShop, "SHOP", 2.1f, unlitMat, new Vector3(0f, 1.15f, 0f));
 
             // Lantern posts with toggleable 2D point lights (respects GraphicsSettingsManager Low/Med/High)
             Vector3[] postCoords = { new Vector3(-2.6f, 2.2f, 0f), new Vector3(2.6f, 2.2f, 0f), new Vector3(-2.6f, -2.5f, 0f), new Vector3(2.6f, -2.5f, 0f) };
@@ -303,12 +337,12 @@ namespace ProjectFrontier.Editor
                 AddPointLight2D(lp.transform, new Vector3(0.18f, 0.35f, 0f), FrontierPalette.HearthGold, 1.05f, 3.6f);
             }
 
-            // Pine tree perimeter
+            // Pine tree perimeter (west road gateway left open for West Homestead path)
             Vector3[] pineCoords =
             {
                 new Vector3(-11.5f, 6.2f, 0f), new Vector3(-9.5f, 6.6f, 0f), new Vector3(-3.2f, 6.4f, 0f),
                 new Vector3(3.2f, 6.4f, 0f), new Vector3(9.5f, 6.6f, 0f), new Vector3(11.5f, 6.2f, 0f),
-                new Vector3(-11.8f, 1.5f, 0f), new Vector3(11.8f, 1.5f, 0f),
+                new Vector3(-11.8f, 3.0f, 0f), new Vector3(11.8f, 1.5f, 0f),
                 new Vector3(-11.5f, -6.2f, 0f), new Vector3(-9.2f, -6.5f, 0f), new Vector3(9.2f, -6.5f, 0f), new Vector3(11.5f, -6.2f, 0f)
             };
             for (int i = 0; i < pineCoords.Length; i++)
@@ -323,6 +357,108 @@ namespace ProjectFrontier.Editor
                 SpawnProp(propsRoot.transform, $"FenceN_{x}", new Vector3(x, 5.5f, 0f), fence, mat, sortOrder: 6, addCollider: false);
                 SpawnProp(propsRoot.transform, $"FenceS_{x}", new Vector3(x, -6.0f, 0f), fence, mat, sortOrder: 6, addCollider: false);
             }
+        }
+
+        private static void BuildHomesteadZone(Transform parent, FrontierFarmManager farmMgr, Sprite cottage, Sprite pine, Sprite fence, FarmSprites farm, Material litMat, Material unlitMat)
+        {
+            var homesteadRoot = new GameObject("HomesteadRoot");
+            homesteadRoot.transform.SetParent(parent, false);
+
+            // Player homestead cabin + warm porch light
+            var cabinGo = SpawnProp(homesteadRoot.transform, "HomesteadCottage", HomesteadCottagePos, cottage, litMat, sortOrder: 8, addCollider: true);
+            AddPointLight2D(cabinGo.transform, new Vector3(0f, -1.1f, 0f), FrontierPalette.HearthGold, 1.0f, 3.4f);
+
+            // Crafting bench (herbs -> potions/buffs)
+            var benchGo = SpawnProp(homesteadRoot.transform, "CraftingBench", CraftingBenchPos, farm.craftingBench, litMat, sortOrder: 12, addCollider: true);
+            AttachStation(benchGo, HomesteadStationKind.CraftingBench, "CRAFT", 2.0f, unlitMat, new Vector3(0f, 1.15f, 0f));
+
+            // Rest post (day skip -> timestamp-delta crop catch-up)
+            var restGo = SpawnProp(homesteadRoot.transform, "HomesteadRestPost", RestPostPos, farm.restPost, litMat, sortOrder: 12, addCollider: true);
+            AddPointLight2D(restGo.transform, new Vector3(0f, 0.35f, 0f), FrontierPalette.HearthGold, 0.95f, 3.2f);
+            AttachStation(restGo, HomesteadStationKind.RestBed, "REST", 1.9f, unlitMat, new Vector3(0f, 1.2f, 0f));
+
+            // Timber fences & western pines framing the homestead meadow
+            for (int x = -22; x <= -14; x += 2)
+            {
+                if (x != -18 && x != -20)
+                    SpawnProp(homesteadRoot.transform, $"HomesteadFenceN_{x}", new Vector3(x, 5.5f, 0f), fence, litMat, sortOrder: 6, addCollider: false);
+                SpawnProp(homesteadRoot.transform, $"HomesteadFenceS_{x}", new Vector3(x, -5.4f, 0f), fence, litMat, sortOrder: 6, addCollider: false);
+            }
+            Vector3[] westPines =
+            {
+                new Vector3(-24.2f, 5.5f, 0f),
+                new Vector3(-24.5f, 1.5f, 0f),
+                new Vector3(-24.2f, -4.8f, 0f),
+                new Vector3(-14.2f, -5.8f, 0f)
+            };
+            for (int i = 0; i < westPines.Length; i++)
+            {
+                SpawnProp(homesteadRoot.transform, $"HomesteadPine_{i + 1}", westPines[i], pine, litMat, sortOrder: 14, addCollider: false);
+            }
+
+            // Pre-baked 8x4 chunked plot renderers (zero per-plot MonoBehaviours; driven purely on-mutation)
+            var plotsRootGo = new GameObject("FarmPlots");
+            plotsRootGo.transform.SetParent(homesteadRoot.transform, false);
+
+            farmMgr.plotGridOrigin = new Vector2(-21.5f, -3.5f);
+            farmMgr.plotCellSize = 1.0f;
+            farmMgr.chunksX = ChunkedFarmGrid.DefaultChunksX;
+            farmMgr.chunksY = ChunkedFarmGrid.DefaultChunksY;
+            farmMgr.plotsRoot = plotsRootGo.transform;
+            farmMgr.spriteLitMaterial = litMat;
+            farmMgr.spriteUnlitMaterial = unlitMat;
+            farmMgr.soilUntilledSprite = farm.soilUntilled;
+            farmMgr.soilTilledSprite = farm.soilTilled;
+            farmMgr.soilWateredSprite = farm.soilWatered;
+            farmMgr.cropStage1Sprite = farm.cropStage1;
+            farmMgr.cropStage2Sprite = farm.cropStage2;
+            farmMgr.cropStage3Sprite = farm.cropStage3;
+            farmMgr.cropMoonmintMatureSprite = farm.cropMoonmintMature;
+            farmMgr.cropSunpetalMatureSprite = farm.cropSunpetalMature;
+            farmMgr.cropEmberrootMatureSprite = farm.cropEmberrootMature;
+            farmMgr.plotCursorSprite = farm.plotCursor;
+
+            int width = farmMgr.chunksX * FarmChunk.Size;
+            int height = farmMgr.chunksY * FarmChunk.Size;
+            for (int gy = 0; gy < height; gy++)
+            for (int gx = 0; gx < width; gx++)
+            {
+                var slotGo = new GameObject($"Plot_{gx}_{gy}");
+                slotGo.transform.SetParent(plotsRootGo.transform, false);
+                slotGo.transform.position = farmMgr.PlotToWorld(gx, gy);
+                var soilSr = slotGo.AddComponent<SpriteRenderer>();
+                soilSr.sprite = farm.soilUntilled;
+                soilSr.sharedMaterial = litMat;
+                soilSr.sortingOrder = -90;
+
+                var cropGo = new GameObject("Crop");
+                cropGo.transform.SetParent(slotGo.transform, false);
+                cropGo.transform.localPosition = new Vector3(0f, 0.14f, 0f);
+                var cropSr = cropGo.AddComponent<SpriteRenderer>();
+                cropSr.sharedMaterial = litMat;
+                cropSr.sortingOrder = 4;
+                cropSr.enabled = false;
+            }
+
+            var cursorGo = new GameObject("PlotCursor");
+            cursorGo.transform.SetParent(plotsRootGo.transform, false);
+            var cursorSr = cursorGo.AddComponent<SpriteRenderer>();
+            cursorSr.sprite = farm.plotCursor;
+            cursorSr.sharedMaterial = unlitMat;
+            cursorSr.sortingOrder = 15;
+            cursorSr.enabled = false;
+            farmMgr.plotCursorRenderer = cursorSr;
+        }
+
+        private static void AttachStation(GameObject target, HomesteadStationKind kind, string label, float radius, Material unlitMat, Vector3 promptOffset)
+        {
+            var promptGo = MakeSpriteChild(target.transform, "StationPrompt", talkBubble, unlitMat, promptOffset, 45);
+            promptGo.SetActive(false);
+            var st = target.AddComponent<HomesteadStation>();
+            st.stationKind = kind;
+            st.actionLabel = label;
+            st.interactRadius = radius;
+            st.promptIndicator = promptGo.transform;
         }
 
         private static GameObject SpawnProp(Transform parent, string name, Vector3 pos, Sprite sprite, Material mat, int sortOrder, bool addCollider)
@@ -533,6 +669,9 @@ namespace ProjectFrontier.Editor
             // Hybrid NPC Chatbox (#14: portrait + mood + 2-3 quick-reply chips + free-text input bar)
             BuildHybridChatbox(hudRoot.transform, shell, uiSolid, uiPanel);
 
+            // Homestead Satchel, Crafting Bench & Pip's Shop UI + Gold/Seed/Buff HUD strip (#19)
+            BuildFarmUi(canvasGo, hudRoot.transform, uiSolid, uiPanel);
+
             // 3. PAUSE & GRAPHICS/AUDIO SETTINGS SCREEN
             var pauseRoot = CreateFullRect(canvasGo.transform, "PauseScreen");
             var pauseScrim = CreateImage(pauseRoot.transform, "PauseScrim", uiSolid, FrontierPalette.WithAlpha(FrontierPalette.InkDark, 0.72f), raycast: true);
@@ -709,8 +848,13 @@ namespace ProjectFrontier.Editor
             deltaTxt.enableAutoSizing = true;
             deltaTxt.fontSizeMin = 10f;
             deltaTxt.fontSizeMax = 13f;
-            SetAnchored(deltaTxt.rectTransform, new Vector2(0f, 0.5f), new Vector2(1f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(162f, 0f), new Vector2(-676f, 28f));
+            SetAnchored(deltaTxt.rectTransform, new Vector2(0f, 0.5f), new Vector2(1f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(112f, 0f), new Vector2(-772f, 28f));
             chatbox.deltaToastText = deltaTxt;
+
+            var shopBtn = CreateStyledButton(headerGo.transform, "ShopButton", uiPanel, "SHOP", 14f, FrontierPalette.HerbOlive, FrontierPalette.CreamParchment, out _);
+            SetAnchored(shopBtn.GetComponent<RectTransform>(), new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), new Vector2(-180f, 0f), new Vector2(86f, 30f));
+            shopBtn.gameObject.SetActive(false);
+            chatbox.shopButton = shopBtn;
 
             var moodBg = CreateImage(headerGo.transform, "MoodBadge", uiPanel, FrontierPalette.ForgeSoot, raycast: false);
             moodBg.type = UnityEngine.UI.Image.Type.Sliced;
@@ -875,6 +1019,169 @@ namespace ProjectFrontier.Editor
             chatbox.sendButtonLabel = sendLbl;
 
             dlgPanel.gameObject.SetActive(false);
+        }
+
+        private static void BuildFarmUi(GameObject canvasGo, Transform hudParent, Sprite uiSolid, Sprite uiPanel)
+        {
+            var farmUi = canvasGo.AddComponent<FrontierFarmUI>();
+            farmUi.panelSprite = uiPanel;
+            farmUi.solidSprite = uiSolid;
+            farmUi.tmpOutlineMaterial = AssetDatabase.LoadAssetAtPath<Material>("Assets/Art/Generated/TmpUiOutline.mat");
+
+            // 1. Compact HUD Gold/Seed Strip + Bag Button (top-right, directly under GFX/PAUSE)
+            var goldStrip = CreateImage(hudParent, "HudGoldStrip", uiPanel, FrontierPalette.WithAlpha(FrontierPalette.SlatePanel, 0.90f), raycast: false);
+            goldStrip.type = UnityEngine.UI.Image.Type.Sliced;
+            SetAnchored(goldStrip.rectTransform, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-136f, -84f), new Vector2(224f, 44f));
+            var goldSeedTxt = CreateStyledTmp(goldStrip.transform, "HudGoldSeedText", "50G · MOONMINT (3)", 15f, FrontierPalette.HearthGold, TextAlignmentOptions.Center);
+            goldSeedTxt.textWrappingMode = TextWrappingModes.NoWrap;
+            goldSeedTxt.overflowMode = TextOverflowModes.Truncate;
+            goldSeedTxt.enableAutoSizing = true;
+            goldSeedTxt.fontSizeMin = 11f;
+            goldSeedTxt.fontSizeMax = 15f;
+            goldSeedTxt.characterSpacing = 1.5f;
+            StretchFill(goldSeedTxt.rectTransform, 8f, 4f);
+            farmUi.hudGoldSeedText = goldSeedTxt;
+
+            var bagBtn = CreateStyledButton(hudParent, "HudBagButton", uiPanel, "BAG", 18f, FrontierPalette.FrontierTeal, FrontierPalette.CreamParchment, out _);
+            SetAnchored(bagBtn.GetComponent<RectTransform>(), new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-24f, -84f), new Vector2(102f, 44f));
+            farmUi.hudBagButton = bagBtn;
+
+            // Active Potion Buff Badge (hidden until a potion buff is active)
+            var buffBadge = CreateImage(hudParent, "HudBuffBadge", uiPanel, FrontierPalette.WithAlpha(FrontierPalette.ElderIndigo, 0.92f), raycast: false);
+            buffBadge.type = UnityEngine.UI.Image.Type.Sliced;
+            SetAnchored(buffBadge.rectTransform, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-24f, -136f), new Vector2(336f, 30f));
+            var buffTxt = CreateStyledTmp(buffBadge.transform, "HudBuffText", string.Empty, 13f, FrontierPalette.HearthGold, TextAlignmentOptions.Center);
+            buffTxt.textWrappingMode = TextWrappingModes.NoWrap;
+            buffTxt.overflowMode = TextOverflowModes.Truncate;
+            buffTxt.enableAutoSizing = true;
+            buffTxt.fontSizeMin = 10f;
+            buffTxt.fontSizeMax = 13f;
+            buffTxt.characterSpacing = 1.4f;
+            StretchFill(buffTxt.rectTransform, 8f, 2f);
+            buffBadge.gameObject.SetActive(false);
+            farmUi.hudBuffBadgeRoot = buffBadge.gameObject;
+            farmUi.hudBuffBadgeText = buffTxt;
+
+            // 2. Modal Shell (Bag / Crafting Bench / Pip's Herb Shop)
+            var modalRoot = CreateFullRect(hudParent, "FarmModal");
+            var modalScrim = CreateImage(modalRoot.transform, "FarmModalScrim", uiSolid, FrontierPalette.WithAlpha(FrontierPalette.InkDark, 0.72f), raycast: true);
+            StretchFill(modalScrim.rectTransform);
+
+            var modalCard = CreateImage(modalRoot.transform, "FarmModalCard", uiPanel, FrontierPalette.SlatePanel, raycast: true);
+            modalCard.type = UnityEngine.UI.Image.Type.Sliced;
+            SetAnchored(modalCard.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(780f, 520f));
+
+            // Header Row
+            var modalTitle = CreateStyledTmp(modalCard.transform, "ModalTitle", "HOMESTEAD SATCHEL", 20f, FrontierPalette.HearthGold, TextAlignmentOptions.Left);
+            modalTitle.textWrappingMode = TextWrappingModes.NoWrap;
+            modalTitle.overflowMode = TextOverflowModes.Truncate;
+            modalTitle.enableAutoSizing = true;
+            modalTitle.fontSizeMin = 13f;
+            modalTitle.fontSizeMax = 20f;
+            SetAnchored(modalTitle.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(18f, -14f), new Vector2(510f, 36f));
+
+            var modalGold = CreateStyledTmp(modalCard.transform, "ModalGold", "GOLD: 50G", 18f, FrontierPalette.CreamParchment, TextAlignmentOptions.Right);
+            modalGold.textWrappingMode = TextWrappingModes.NoWrap;
+            modalGold.enableAutoSizing = true;
+            modalGold.fontSizeMin = 13f;
+            modalGold.fontSizeMax = 18f;
+            SetAnchored(modalGold.rectTransform, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-72f, -14f), new Vector2(156f, 36f));
+
+            var modalClose = CreateStyledButton(modalCard.transform, "ModalCloseBtn", uiPanel, "X", 18f, FrontierPalette.WithAlpha(FrontierPalette.DuskAlert, 0.88f), FrontierPalette.CreamParchment, out _);
+            SetAnchored(modalClose.GetComponent<RectTransform>(), new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-14f, -12f), new Vector2(46f, 36f));
+
+            // Tab Bar
+            var tabsRow = new GameObject("TabRow", typeof(RectTransform), typeof(HorizontalLayoutGroup));
+            tabsRow.transform.SetParent(modalCard.transform, false);
+            SetAnchored(tabsRow.GetComponent<RectTransform>(), new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -58f), new Vector2(-36f, 40f));
+            var tabHlg = tabsRow.GetComponent<HorizontalLayoutGroup>();
+            tabHlg.spacing = 10f;
+            tabHlg.childAlignment = TextAnchor.MiddleCenter;
+            tabHlg.childControlWidth = true;
+            tabHlg.childControlHeight = true;
+            tabHlg.childForceExpandWidth = true;
+            tabHlg.childForceExpandHeight = true;
+
+            var tabBag = CreateStyledButton(tabsRow.transform, "TabBagBtn", uiPanel, "BAG", 16f, FrontierPalette.FrontierTeal, FrontierPalette.CreamParchment, out _);
+            var tabCraft = CreateStyledButton(tabsRow.transform, "TabCraftBtn", uiPanel, "CRAFT", 16f, FrontierPalette.SlatePanel, FrontierPalette.CreamParchment, out _);
+            var tabShop = CreateStyledButton(tabsRow.transform, "TabShopBtn", uiPanel, "PIP SHOP", 16f, FrontierPalette.SlatePanel, FrontierPalette.CreamParchment, out _);
+
+            // Standing / Active Seed Subheader
+            var standingTxt = CreateStyledTmp(modalCard.transform, "ModalStandingText", "ACTIVE SEED: MOONMINT", 14f, FrontierPalette.CreamParchment, TextAlignmentOptions.Center);
+            standingTxt.textWrappingMode = TextWrappingModes.NoWrap;
+            standingTxt.overflowMode = TextOverflowModes.Truncate;
+            standingTxt.enableAutoSizing = true;
+            standingTxt.fontSizeMin = 11f;
+            standingTxt.fontSizeMax = 14f;
+            SetAnchored(standingTxt.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -104f), new Vector2(-36f, 24f));
+
+            // Scrollable Content Area
+            var scrollGo = new GameObject("ContentScrollView", typeof(RectTransform), typeof(UnityEngine.UI.Image), typeof(ScrollRect));
+            scrollGo.transform.SetParent(modalCard.transform, false);
+            var scrollRt = scrollGo.GetComponent<RectTransform>();
+            scrollRt.anchorMin = Vector2.zero;
+            scrollRt.anchorMax = Vector2.one;
+            scrollRt.offsetMin = new Vector2(18f, 44f);
+            scrollRt.offsetMax = new Vector2(-18f, -134f);
+            var scrollBg = scrollGo.GetComponent<UnityEngine.UI.Image>();
+            scrollBg.sprite = uiSolid;
+            scrollBg.color = FrontierPalette.WithAlpha(FrontierPalette.InkDark, 0.45f);
+            scrollBg.raycastTarget = true;
+
+            var viewportGo = new GameObject("Viewport", typeof(RectTransform), typeof(RectMask2D));
+            viewportGo.transform.SetParent(scrollGo.transform, false);
+            var viewportRt = viewportGo.GetComponent<RectTransform>();
+            StretchFill(viewportRt, 4f, 4f);
+
+            var contentGo = new GameObject("Content", typeof(RectTransform), typeof(VerticalLayoutGroup), typeof(ContentSizeFitter));
+            contentGo.transform.SetParent(viewportGo.transform, false);
+            var contentRt = contentGo.GetComponent<RectTransform>();
+            contentRt.anchorMin = new Vector2(0f, 1f);
+            contentRt.anchorMax = new Vector2(1f, 1f);
+            contentRt.pivot = new Vector2(0.5f, 1f);
+            contentRt.anchoredPosition = Vector2.zero;
+            contentRt.sizeDelta = Vector2.zero;
+            var vlg = contentGo.GetComponent<VerticalLayoutGroup>();
+            vlg.padding = new RectOffset(6, 6, 6, 6);
+            vlg.spacing = 6f;
+            vlg.childAlignment = TextAnchor.UpperCenter;
+            vlg.childControlWidth = true;
+            vlg.childControlHeight = true;
+            vlg.childForceExpandWidth = true;
+            vlg.childForceExpandHeight = false;
+            var fitter = contentGo.GetComponent<ContentSizeFitter>();
+            fitter.horizontalFit = ContentSizeFitter.FitMode.Unconstrained;
+            fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+
+            var scrollRect = scrollGo.GetComponent<ScrollRect>();
+            scrollRect.viewport = viewportRt;
+            scrollRect.content = contentRt;
+            scrollRect.horizontal = false;
+            scrollRect.vertical = true;
+            scrollRect.movementType = ScrollRect.MovementType.Clamped;
+            scrollRect.scrollSensitivity = 24f;
+
+            // Footer Feedback Toast
+            var toastTxt = CreateStyledTmp(modalCard.transform, "FeedbackToast", string.Empty, 14f, FrontierPalette.HearthGold, TextAlignmentOptions.Center);
+            toastTxt.textWrappingMode = TextWrappingModes.NoWrap;
+            toastTxt.overflowMode = TextOverflowModes.Truncate;
+            toastTxt.enableAutoSizing = true;
+            toastTxt.fontSizeMin = 11f;
+            toastTxt.fontSizeMax = 14f;
+            SetAnchored(toastTxt.rectTransform, new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 10f), new Vector2(-36f, 28f));
+
+            farmUi.modalRoot = modalRoot;
+            farmUi.modalTitleText = modalTitle;
+            farmUi.modalGoldText = modalGold;
+            farmUi.modalStandingText = standingTxt;
+            farmUi.feedbackToastText = toastTxt;
+            farmUi.closeButton = modalClose;
+            farmUi.tabBagButton = tabBag;
+            farmUi.tabCraftButton = tabCraft;
+            farmUi.tabShopButton = tabShop;
+            farmUi.contentContainer = contentRt;
+
+            modalRoot.SetActive(false);
         }
 
         private static UnityEngine.UI.Button CreateStyledButton(Transform parent, string name, Sprite panelSprite, string label, float fontSize, Color bgColor, Color textColor, out TextMeshProUGUI labelOut)

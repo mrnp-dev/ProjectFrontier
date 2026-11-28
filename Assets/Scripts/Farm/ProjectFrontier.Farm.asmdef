@@ -1,0 +1,16 @@
+{
+    "name": "ProjectFrontier.Farm",
+    "rootNamespace": "ProjectFrontier.Farm",
+    "references": [
+        "ProjectFrontier.Social"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

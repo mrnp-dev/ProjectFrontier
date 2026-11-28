@@ -76,6 +76,11 @@ namespace ProjectFrontier.World
             float x1 = maxX + padding;
             float y1 = maxY + padding;
 
+            float gridMaxX = Origin.x + Width * CellSize;
+            float gridMaxY = Origin.y + Height * CellSize;
+            if (x1 < Origin.x || x0 > gridMaxX || y1 < Origin.y || y0 > gridMaxY)
+                return;
+
             int cx0 = Mathf.Clamp(Mathf.FloorToInt((x0 - Origin.x) / CellSize), 0, Width - 1);
             int cy0 = Mathf.Clamp(Mathf.FloorToInt((y0 - Origin.y) / CellSize), 0, Height - 1);
             int cx1 = Mathf.Clamp(Mathf.FloorToInt((x1 - Origin.x) / CellSize), 0, Width - 1);
