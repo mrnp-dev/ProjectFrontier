@@ -662,19 +662,33 @@ namespace ProjectFrontier.Editor
             SetAnchored(pauseBtn.GetComponent<RectTransform>(), new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-24f, -20f), new Vector2(114f, 54f));
             shell.hudPauseButton = pauseBtn;
 
-            // Bottom-Left Touch Virtual Joystick
-            var joyBg = CreateImage(hudRoot.transform, "TouchJoystickBg", uiJoyRing, Color.white, raycast: true);
-            SetAnchored(joyBg.rectTransform, new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(36f, 34f), new Vector2(150f, 150f));
+            // Touch controls live in a safe-area container (#35) so notches, rounded corners and the gesture bar
+            // never cover them. Built before the chatbox / farm / guild UI so those later siblings win raycasts.
+            var touchSafe = CreateFullRect(hudRoot.transform, "TouchSafeArea");
+            touchSafe.AddComponent<ProjectFrontier.TouchInput.SafeAreaFitter>();
+
+            // Floating joystick: transparent movement zone = lower-left 40% x 60% of the safe area.
+            // Touching anywhere in it moves the ring under the thumb; release returns it to rest.
+            var joyZone = CreateImage(touchSafe.transform, "TouchJoystickZone", uiSolid, new Color(1f, 1f, 1f, 0f), raycast: true);
+            SetAnchored(joyZone.rectTransform, Vector2.zero, new Vector2(0.4f, 0.6f), Vector2.zero, Vector2.zero, Vector2.zero);
+
+            // Ring 176 (was 150); rest bottom-left corner at (150, 120) instead of (36, 34).
+            const float joySize = 176f;
+            var joyBg = CreateImage(joyZone.transform, "TouchJoystickBg", uiJoyRing, Color.white, raycast: false);
+            SetAnchored(joyBg.rectTransform, Vector2.zero, Vector2.zero, new Vector2(0.5f, 0.5f), new Vector2(150f + joySize * 0.5f, 120f + joySize * 0.5f), new Vector2(joySize, joySize));
             var joyKnob = CreateImage(joyBg.transform, "TouchJoystickKnob", uiJoyKnob, Color.white, raycast: false);
-            SetAnchored(joyKnob.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(64f, 64f));
-            var joyCtrl = joyBg.gameObject.AddComponent<VirtualJoystickUI>();
+            SetAnchored(joyKnob.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(64f * joySize / 150f, 64f * joySize / 150f));
+            var joyCtrl = joyZone.gameObject.AddComponent<VirtualJoystickUI>();
+            joyCtrl.zone = joyZone.rectTransform;
             joyCtrl.background = joyBg.rectTransform;
             joyCtrl.handle = joyKnob.rectTransform;
-            joyCtrl.maxRadius = 46f;
-            shell.touchJoystickRoot = joyBg.gameObject;
+            joyCtrl.maxRadius = 46f * joySize / 150f;   // same 46/150 travel ratio as before -> same feel
+            joyCtrl.restPosition = joyBg.rectTransform.anchoredPosition;
+            joyCtrl.floating = true;
+            shell.touchJoystickRoot = joyZone.gameObject;
 
-            // Bottom-Right Touch Interact Button
-            var talkBtn = CreateStyledButton(hudRoot.transform, "TouchInteractButton", uiPanel, "TALK", 22f, FrontierPalette.FrontierTeal, FrontierPalette.CreamParchment, out var talkLbl);
+            // Bottom-Right Touch Interact Button (inside the safe area)
+            var talkBtn = CreateStyledButton(touchSafe.transform, "TouchInteractButton", uiPanel, "TALK", 22f, FrontierPalette.FrontierTeal, FrontierPalette.CreamParchment, out var talkLbl);
             SetAnchored(talkBtn.GetComponent<RectTransform>(), new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(-36f, 44f), new Vector2(148f, 92f));
             shell.hudInteractButton = talkBtn;
             shell.hudInteractLabel = talkLbl;
