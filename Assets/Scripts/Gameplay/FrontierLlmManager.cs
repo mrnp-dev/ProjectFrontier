@@ -56,13 +56,13 @@ namespace ProjectFrontier
 
         private void Start()
         {
-            if (FrontierGameLoop.Instance != null) FrontierGameLoop.Instance.DialogueClosed += ClearAllHistory;
+            if (FrontierGameLoop.Instance != null) FrontierGameLoop.Instance.DialogueClosed += HandleDialogueClosed;
         }
 
         private void OnDestroy()
         {
             if (Instance != this) return;
-            if (FrontierGameLoop.Instance != null) FrontierGameLoop.Instance.DialogueClosed -= ClearAllHistory;
+            if (FrontierGameLoop.Instance != null) FrontierGameLoop.Instance.DialogueClosed -= HandleDialogueClosed;
             _lifetime?.Cancel();
             _lifetime?.Dispose();
             Instance = null;
@@ -135,6 +135,61 @@ namespace ProjectFrontier
 
         public void ClearAllHistory() => _history.Clear();
 
+        [Header("Long-term memory (#42)")]
+        [Tooltip("After a conversation closes, one small LLM call extracts 0-3 facts the villager keeps across days.")]
+        public bool extractMemories = true;
+        [Tooltip("Recalled memories added to each chat prompt (top N by relevance, recency and importance).")]
+        public int recallMemories = NpcMemoryStore.DefaultRecallCount;
+
+        /// <summary>Raised when an extraction finishes (also when it remembered nothing). For logs, tests and the PR demo.</summary>
+        public event Action<string, MemoryExtractionResult> MemoriesExtracted;
+
+        /// <summary>The memories recalled for the most recent turn per villager (debug/verification).</summary>
+        public IReadOnlyList<MemoryFact> LastRecalled(string npcId) =>
+            _lastRecalled.TryGetValue(npcId, out var l) ? l : (IReadOnlyList<MemoryFact>)Array.Empty<MemoryFact>();
+
+        private readonly Dictionary<string, List<MemoryFact>> _lastRecalled = new Dictionary<string, List<MemoryFact>>();
+        private readonly Dictionary<string, string> _lastMood = new Dictionary<string, string>();
+
+        /// <summary>Conversation over: extract memories from each chat (async, best effort), then forget the short-term history.</summary>
+        private void HandleDialogueClosed()
+        {
+            var finished = new List<KeyValuePair<string, List<ChatMessage>>>(_history);
+            ClearAllHistory();
+            if (!extractMemories) return;
+            foreach (var kv in finished) _ = ExtractAndRetainAsync(kv.Key, kv.Value);
+        }
+
+        /// <summary>
+        /// Runs the after-conversation extraction for one villager and stores the facts. Public so verification
+        /// scripts can drive it directly; returns null if the manager was destroyed or the call was cancelled.
+        /// </summary>
+        public async Task<MemoryExtractionResult> ExtractAndRetainAsync(string npcId, IReadOnlyList<ChatMessage> conversation)
+        {
+            LlmRequest request = MemoryExtractor.BuildRequest(npcId, DisplayNameOf(npcId), conversation);
+            if (request == null) return null;
+            var social = FrontierSocialManager.Instance;
+            int day = social != null ? social.State.Day : 1;
+            _lastMood.TryGetValue(npcId, out string mood);
+            try
+            {
+                MemoryExtractionResult r = await MemoryExtractor.RunAsync(Service.Primary, request, day,
+                    Mathf.Max(Config.timeoutSeconds, 8f), _lifetime.Token, mood);
+                if (this == null) return null;
+                if (r.CalledProvider)
+                    Service.Usage.RecordFeature(MemoryExtractor.FeatureTag, r.PromptTokens, r.CompletionTokens, r.Error != null);
+                if (social != null) social.RetainMemories(r.Facts);
+                string tpd = LlmTurnService.IsTpdCap(r.Error) ? " [tpd_cap]" : string.Empty;
+                Debug.Log($"[Memory] extract {npcId}: {MemoryExtractor.Describe(r)}{tpd} | {MemoryExtractor.FeatureTag} {Service.Usage.GetFeature(MemoryExtractor.FeatureTag)}");
+                MemoriesExtracted?.Invoke(npcId, r);
+                return r;
+            }
+            catch (OperationCanceledException)
+            {
+                return null;
+            }
+        }
+
         /// <summary>
         /// Runs one player -> NPC turn. Always returns a playable reply (offline fallback on any provider failure),
         /// or null if a turn for this villager is already in flight or the manager was destroyed.
@@ -150,6 +205,9 @@ namespace ProjectFrontier
                 var social = FrontierSocialManager.Instance;
                 SocialState state = social != null ? social.State : null;
                 string message = TurnPromptBuilder.SanitizePlayerMessage(playerText);
+                List<MemoryFact> recalled = social != null && recallMemories > 0
+                    ? social.RecallMemories(npcId, message, recallMemories) : new List<MemoryFact>();
+                _lastRecalled[npcId] = recalled;
 
                 LlmRequest request = _builder.Build(new TurnPromptBuilder.Context
                 {
@@ -159,6 +217,7 @@ namespace ProjectFrontier
                     StandingLine = state?.Get(npcId).ToPromptLine(),
                     RumorLine = state != null ? TurnPromptBuilder.BuildRumorLine(state.Rumors, npcId, state.Day, DisplayNameOf) : null,
                     Day = state?.Day ?? 1,
+                    MemoryBlock = NpcMemoryStore.BuildPromptBlock(recalled, state?.Day ?? 1),
                     History = GetHistory(npcId),
                     PlayerMessage = message
                 });
@@ -169,6 +228,9 @@ namespace ProjectFrontier
 
                 Remember(npcId, new ChatMessage(ChatRole.User, message));
                 Remember(npcId, new ChatMessage(ChatRole.Assistant, result.Dialogue));
+                _lastMood[npcId] = result.Mood;
+                if (recalled.Count > 0)
+                    Debug.Log($"[Memory] {npcId} recalled {recalled.Count}: " + string.Join(" | ", recalled.ConvertAll(m => m.text)));
 
                 if (social != null && !result.Deltas.IsZero)
                     result.AppliedDeltas = social.ApplyDelta(npcId, result.Deltas, DeltaSource.LlmTurn).Applied;
