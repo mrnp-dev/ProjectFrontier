@@ -34,6 +34,11 @@ namespace ProjectFrontier
         public float RunDurationSeconds { get => runDurationSeconds; set => runDurationSeconds = Mathf.Max(5f, value); }
         public int NpcsMetCount => _metNpcIds.Count;
         public bool DialogueOpen { get; private set; }
+        /// <summary>
+        /// Online-only (#37): true while the "Reconnecting..." overlay is up. Freezes time (day clock, timers, NPCs) and
+        /// player input without changing <see cref="State"/>, so an open chat survives and resumes where it was.
+        /// </summary>
+        public bool ConnectionHold { get; private set; }
         public VillageNpc ActiveNpc => _activeNpc;
 
         public event Action<RunState> StateChanged;
@@ -41,6 +46,7 @@ namespace ProjectFrontier
         public event Action<float, float> TimerChanged;
         public event Action<VillageNpc, int> DialogueUpdated;
         public event Action DialogueClosed;
+        public event Action<bool> ConnectionHoldChanged;
 
         private readonly HashSet<string> _metNpcIds = new HashSet<string>();
         private VillageNpc _activeNpc;
@@ -91,7 +97,10 @@ namespace ProjectFrontier
         public void StartRun()
         {
             if (State != RunState.Ready) return;
-            Time.timeScale = 1f;
+            // Online-only (#37): the startup gate must pass before gameplay starts.
+            var net = FrontierConnectionManager.Instance;
+            if (net != null && !net.CanStartGameplay) return;
+            ApplyTimeScale();
             CollectedLanterns = 0;
             TimeRemaining = runDurationSeconds;
             _metNpcIds.Clear();
@@ -106,16 +115,31 @@ namespace ProjectFrontier
         {
             if (paused && State == RunState.Running)
             {
-                Time.timeScale = 0f;
-                SynthAudioManager.Instance?.SetPaused(true);
                 SetState(RunState.Paused);
+                ApplyTimeScale();
             }
             else if (!paused && State == RunState.Paused)
             {
-                Time.timeScale = 1f;
-                SynthAudioManager.Instance?.SetPaused(false);
                 SetState(RunState.Running);
+                ApplyTimeScale();
             }
+        }
+
+        /// <summary>Online-only (#37): raised/lowered by <see cref="FrontierConnectionManager"/> for long drops.</summary>
+        public void SetConnectionHold(bool hold)
+        {
+            if (ConnectionHold == hold) return;
+            ConnectionHold = hold;
+            ApplyTimeScale();
+            ConnectionHoldChanged?.Invoke(hold);
+        }
+
+        /// <summary>Time stops for the pause menu or a connection hold, and resumes only when neither applies.</summary>
+        private void ApplyTimeScale()
+        {
+            bool frozen = State == RunState.Paused || ConnectionHold;
+            Time.timeScale = frozen ? 0f : 1f;
+            SynthAudioManager.Instance?.SetPaused(frozen);
         }
 
         public void TogglePause()
@@ -141,7 +165,7 @@ namespace ProjectFrontier
 
         public void OpenOrAdvanceDialogue(VillageNpc npc)
         {
-            if (State != RunState.Running || npc == null) return;
+            if (State != RunState.Running || npc == null || ConnectionHold) return;
 
             if (!DialogueOpen || _activeNpc != npc)
             {

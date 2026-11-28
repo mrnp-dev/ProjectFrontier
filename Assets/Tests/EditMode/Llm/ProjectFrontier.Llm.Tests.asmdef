@@ -4,6 +4,7 @@
     "references": [
         "ProjectFrontier.Llm",
         "ProjectFrontier.Social",
+        "ProjectFrontier.Net",
         "UnityEngine.TestRunner",
         "UnityEditor.TestRunner"
     ],

@@ -3,6 +3,7 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using ProjectFrontier.Llm;
+using ProjectFrontier.Net;
 using UnityEngine;
 
 namespace ProjectFrontier.Guild
@@ -91,10 +92,10 @@ namespace ProjectFrontier.Guild
 
             string fallback = bounty.StaticDescription;
             if (_provider == null || !_provider.RequiresNetwork)
-                return new BountyFlavorResult(fallback, true, "offline provider", "static");
+                return new BountyFlavorResult(fallback, true, "no AI provider", "static");
 
             if (!_isOnline())
-                return new BountyFlavorResult(fallback, true, "no network", "static");
+                return new BountyFlavorResult(fallback, true, "no connection", "static");
 
             LlmRequest req = BuildRequest(bounty, day, rank, townHint);
             using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(_timeoutSeconds));
@@ -103,6 +104,7 @@ namespace ProjectFrontier.Guild
             try
             {
                 LlmCompletion completion = await _provider.CompleteAsync(req, linkedCts.Token);
+                ConnectionReports.Success(ConnectionSource.Llm);
                 string parsed = ParseFlavor(completion?.Text);
                 if (!string.IsNullOrWhiteSpace(parsed))
                     return new BountyFlavorResult(parsed, false, null, _provider.Name);
@@ -112,10 +114,12 @@ namespace ProjectFrontier.Guild
             catch (OperationCanceledException)
             {
                 if (ct.IsCancellationRequested) throw;
+                ConnectionReports.Failure(ConnectionSource.Llm, "timeout");
                 return new BountyFlavorResult(fallback, true, "timeout", _provider.Name);
             }
             catch (Exception e)
             {
+                ConnectionReports.Outcome(ConnectionSource.Llm, !LlmTurnService.IsTransport(e), e.Message);
                 return new BountyFlavorResult(fallback, true, e.Message, _provider.Name);
             }
         }

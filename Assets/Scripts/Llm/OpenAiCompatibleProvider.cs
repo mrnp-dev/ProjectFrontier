@@ -115,8 +115,9 @@ namespace ProjectFrontier.Llm
                     return new LlmCompletion { Text = salvaged, Model = _config.model, Salvaged = true };
 
                 string detail = TryReadError(payload);
+                bool transport = uwr.result == UnityWebRequest.Result.ConnectionError || uwr.responseCode <= 0;
                 throw new LlmProviderException($"HTTP {uwr.responseCode} {uwr.error}{(detail != null ? ": " + detail : string.Empty)}",
-                    LlmProviderException.IsSamplingFailure(uwr.responseCode, payload));
+                    LlmProviderException.IsSamplingFailure(uwr.responseCode, payload), transport);
             }
 
             WireResponse response;

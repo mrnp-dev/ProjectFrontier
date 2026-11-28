@@ -270,7 +270,7 @@ namespace ProjectFrontier
                 string fallbackJson = MockLlmProvider.Respond(playerText);
                 result = TurnResponseParser.Parse(fallbackJson, npc.persona?.GetStarterQuickReplies());
                 result.NpcId = npc.NpcId;
-                result.ProviderName = "offline";
+                result.ProviderName = MockLlmProvider.ProviderName;
             }
 
             if (this == null || !IsOpen || epoch != _conversationEpoch) return;
@@ -535,16 +535,19 @@ namespace ProjectFrontier
         private void UpdateStatusHint(bool usedFallback)
         {
             if (statusHintText == null) return;
+            // Online-only (#37): a reply from built-in lines during a short drop stays quiet (no "offline mode" label);
+            // long drops are handled by the "Reconnecting..." overlay. Dev builds without an AI key say so.
             var llm = FrontierLlmManager.Instance;
-            if (usedFallback || llm == null || !llm.IsOnlineProvider)
+            bool noAiConfigured = llm == null || !llm.IsOnlineProvider;
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            if (noAiConfigured)
             {
-                statusHintText.text = "OFFLINE MODE";
+                statusHintText.text = "DEV: BUILT-IN LINES (NO AI KEY)";
                 statusHintText.color = FrontierPalette.WithAlpha(FrontierPalette.BrassBorder, 0.85f);
+                return;
             }
-            else
-            {
-                statusHintText.text = string.Empty;
-            }
+#endif
+            statusHintText.text = string.Empty;
         }
 
         private void HandleSendClicked()

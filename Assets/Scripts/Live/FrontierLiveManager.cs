@@ -19,7 +19,7 @@ namespace ProjectFrontier
 
     /// <summary>
     /// Live floor wired to create-generated PlayerAuthentication, LiveOps (liveops_enabled), and PlayerSave,
-    /// plus LeaderboardsService with graceful headless fallback when dashboard resources are not yet provisioned.
+    /// plus LeaderboardsService (rank shows "unavailable" when the dashboard resource is missing). Online-only (#37): outcomes feed the connection monitor.
     /// </summary>
     public class FrontierLiveManager : MonoBehaviour
     {
@@ -181,11 +181,13 @@ namespace ProjectFrontier
                 }
                 await LeaderboardsService.Instance.AddPlayerScoreAsync(LeaderboardId, score);
                 var entry = await LeaderboardsService.Instance.GetPlayerScoreAsync(LeaderboardId);
+                ProjectFrontier.Net.ConnectionReports.Success(ProjectFrontier.Net.ConnectionSource.Leaderboards);
                 LastRankLabel = entry != null ? $"Rank: #{entry.Rank + 1} ({Mathf.RoundToInt((float)entry.Score)} pts)" : "Rank: unavailable";
             }
-            catch (Exception)
+            catch (Exception e)
             {
-                // Graceful degradation when leaderboard resource is not yet deployed on UGS Dashboard.
+                // Missing dashboard resource still means the service answered; only transport errors count as a drop (#37).
+                ProjectFrontier.Net.ConnectionReports.Outcome(ProjectFrontier.Net.ConnectionSource.Leaderboards, !PlayerSave.IsConnectionError(e), e.Message);
                 LastRankLabel = "Rank: unavailable";
             }
         }

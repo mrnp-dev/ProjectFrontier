@@ -120,6 +120,7 @@ namespace ProjectFrontier
         {
             var loop = FrontierGameLoop.Instance;
             if (loop == null) return;
+            if (loop.ConnectionHold) return; // online-only (#37): "Reconnecting..." freezes all player input
 
             bool modalOpen = FrontierFarmUI.IsAnyModalOpen || FrontierGuildUI.IsAnyModalOpen;
             var kb = Keyboard.current;

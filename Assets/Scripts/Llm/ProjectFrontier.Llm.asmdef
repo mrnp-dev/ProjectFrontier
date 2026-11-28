@@ -2,7 +2,8 @@
     "name": "ProjectFrontier.Llm",
     "rootNamespace": "ProjectFrontier.Llm",
     "references": [
-        "ProjectFrontier.Social"
+        "ProjectFrontier.Social",
+        "ProjectFrontier.Net"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

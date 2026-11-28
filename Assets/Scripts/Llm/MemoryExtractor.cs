@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using ProjectFrontier.Net;
 using ProjectFrontier.Social;
 using UnityEngine;
 
@@ -112,14 +113,14 @@ namespace ProjectFrontier.Llm
 
         /// <summary>
         /// Runs the extraction on <paramref name="provider"/> with a hard timeout. Never throws (except caller cancel):
-        /// offline provider, transport errors, timeouts and bad JSON all return an empty result with <see cref="MemoryExtractionResult.Error"/>.
+        /// no AI provider, transport errors, timeouts and bad JSON all return an empty result with <see cref="MemoryExtractionResult.Error"/>.
         /// </summary>
         public static async Task<MemoryExtractionResult> RunAsync(ILLMProvider provider, LlmRequest request, int day,
             float timeoutSeconds, CancellationToken ct, string mood = null)
         {
             var result = new MemoryExtractionResult();
             if (request == null) { result.Error = "nothing to extract"; return result; }
-            if (provider == null || !provider.RequiresNetwork) { result.Error = "offline provider"; return result; }
+            if (provider == null || !provider.RequiresNetwork) { result.Error = "no AI provider"; return result; }
 
             var sw = Stopwatch.StartNew();
             LlmCompletion completion = null;
@@ -134,12 +135,14 @@ namespace ProjectFrontier.Llm
                     ct.ThrowIfCancellationRequested();
                     _ = call.ContinueWith(x => { _ = x.Exception; }, TaskContinuationOptions.OnlyOnFaulted);
                     result.Error = $"timeout after {timeoutSeconds:0.#}s";
+                    ConnectionReports.Failure(ConnectionSource.Llm, "timeout");
                 }
                 else
                 {
                     cts.Cancel();
                     completion = await call;
                     result.CalledProvider = true;
+                    ConnectionReports.Success(ConnectionSource.Llm);
                 }
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
@@ -147,6 +150,7 @@ namespace ProjectFrontier.Llm
             {
                 result.CalledProvider = true;
                 result.Error = LlmTurnService.ClassifyFailure(e.Message);
+                ConnectionReports.Outcome(ConnectionSource.Llm, !LlmTurnService.IsTransport(e), e.Message);
             }
             result.LatencyMs = sw.ElapsedMilliseconds;
 

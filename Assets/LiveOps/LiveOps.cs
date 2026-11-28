@@ -1,5 +1,6 @@
 using System;
 using System.Threading.Tasks;
+using ProjectFrontier.Net;
 using Unity.Services.RemoteConfig;
 using UnityEngine;
 
@@ -26,10 +27,12 @@ public static class LiveOps
             }
             var config = await RemoteConfigService.Instance.FetchConfigsAsync(
                 new UserAttributes(), new AppAttributes());
+            ConnectionReports.Success(ConnectionSource.RemoteConfig);
             return config.GetBool(EnabledKey, true);
         }
         catch (Exception e)
         {
+            ConnectionReports.Failure(ConnectionSource.RemoteConfig, e.Message);
             Debug.LogWarning($"Remote Config fetch failed, live features stay on: {e.Message}");
             return true;
         }

@@ -3,7 +3,8 @@
     "references": [
         "Unity.Services.Core",
         "Unity.Services.RemoteConfig",
-        "PlayerAuthentication"
+        "PlayerAuthentication",
+        "ProjectFrontier.Net"
     ],
     "autoReferenced": true
 }

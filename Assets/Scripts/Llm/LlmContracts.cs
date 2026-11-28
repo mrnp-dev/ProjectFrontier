@@ -35,7 +35,7 @@ namespace ProjectFrontier.Llm
         public float Temperature = 0.85f;
         public int EstimatedInputTokens;
 
-        /// <summary>The player's line for this turn (last user message), used by the offline provider.</summary>
+        /// <summary>The player's line for this turn (last user message), used by the built-in lines provider.</summary>
         public string PlayerMessage
         {
             get
@@ -108,7 +108,17 @@ namespace ProjectFrontier.Llm
         /// </summary>
         public bool IsRetryable { get; }
 
-        public LlmProviderException(string message, bool isRetryable = false) : base(message) { IsRetryable = isRetryable; }
+        /// <summary>
+        /// True when no server answered (DNS, refused, airplane mode: HTTP code 0). Counts against the connection
+        /// monitor (#37) and gets one quiet retry; any HTTP status (401, 429 quota, 500) means the server was reached.
+        /// </summary>
+        public bool IsTransportFailure { get; }
+
+        public LlmProviderException(string message, bool isRetryable = false, bool isTransportFailure = false) : base(message)
+        {
+            IsRetryable = isRetryable;
+            IsTransportFailure = isTransportFailure;
+        }
 
         private static readonly string[] SamplingFailureMarkers =
         {

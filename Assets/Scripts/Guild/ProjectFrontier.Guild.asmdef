@@ -4,7 +4,8 @@
     "references": [
         "ProjectFrontier.Social",
         "ProjectFrontier.Farm",
-        "ProjectFrontier.Llm"
+        "ProjectFrontier.Llm",
+        "ProjectFrontier.Net"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

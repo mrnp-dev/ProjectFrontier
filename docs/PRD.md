@@ -59,7 +59,7 @@ Purpose: Replace the starter lantern-shard harness with the true core differenti
 
 - Full **5-NPC cast** in Oakhaven: **Bram** (Blacksmith), **Mira** (Tavern Keeper), **Captain Aldric** (Guild Master), **Lyra** (Rival Adventurer), **Pip** (Herbalist & Beast-Keeper).
 - **Hybrid Chatbox UI**: free-text input + 2-3 clickable quick-reply chips + speaker mood indicator.
-- **Swappable LLM Layer (`ILLMProvider`)**: OpenAI-compatible cloud API integration (with offline/local fallback stub for testing), single-call structured JSON output (dialogue + bounded relationship deltas + mood + quick replies).
+- **Swappable LLM Layer (`ILLMProvider`)**: OpenAI-compatible cloud API integration (built-in lines as the cushion for one failed turn during a short connection drop, and for tests), single-call structured JSON output (dialogue + bounded relationship deltas + mood + quick replies).
 - **Deterministic C# Gossip & Bias Engine**: hidden NPC-to-NPC trust matrix, `Rumor` creation on notable player actions, end-of-day co-location rumor exchange, and single-line rumor injection into NPC prompts.
 - **Day/Night Cycle & Deterministic NPC Schedules**: NPCs move between daily spots (forge, square, tavern, guild hall, herb garden) where gossip exchanges trigger.
 - **Pause Menu & Custom Preset Completion**: expose granular Custom toggles in UI and fix win-screen timing over milestone banner.
@@ -67,7 +67,7 @@ Purpose: Replace the starter lantern-shard harness with the true core differenti
 ### Phase 3 - Life-Sim, Dungeon & Raid Vertical Slice (Milestone 3 - **Planned**)
 Purpose: Connect social state to the full cozy ARPG gameplay loop inside a compact slice map.
 
-- **Farmstead & Crafting:** Chunked crop plots, timestamp-delta offline/day-skip growth simulation, herbs/potions tied to Pip.
+- **Farmstead & Crafting:** Chunked crop plots, timestamp-delta growth while the app is closed, plus day-skip growth, herbs/potions tied to Pip.
 - **Adventurers Guild:** Quest board managed by Captain Aldric with async LLM-flavored bounty descriptions.
 - **Dungeon Biome (1 biome, 3 floors + mini-boss):** Procedural BSP/room-graph + drunkard-walk generation, real-time 2D ARPG combat, loot fueling Bram's smithing upgrades.
 - **Pets:** Tameable/upgradeable beast companions tied to Pip.
@@ -83,7 +83,7 @@ Purpose: Connect social state to the full cozy ARPG gameplay loop inside a compa
 
 ## 5. Key User Journeys
 
-1. **First Launch on Low-End Android:** App boots cleanly, auto-selects `Low` (<= 3 GB RAM) or `Medium`, signs in anonymously via UGS (or falls back to local cache offline), and drops the player onto the Title screen with live Oakhaven preview in under 5 seconds.
+1. **First Launch on Low-End Android:** App boots cleanly, auto-selects `Low` (<= 3 GB RAM) or `Medium`, checks the internet connection, signs in anonymously via UGS and checks the AI endpoint (or shows "Connect to the internet to play" with Retry), and drops the player onto the Title screen with live Oakhaven preview in under 5 seconds.
 2. **Hybrid NPC Conversation (Milestone 2):** Player walks up to Bram with the virtual joystick, taps Talk, reads a crisp 1-2 sentence greeting, and either taps a suggested reply chip or types a custom insult/compliment. Within ~1-2s, Bram responds in character, his relationship axes update within C#-clamped bounds, and a `Rumor` is queued if the interaction was notable.
 3. **Gossip Ripple (Milestone 2):** At evening tavern time, Bram and Mira share a schedule spot. The deterministic C# Gossip Engine propagates Bram's rumor to Mira weighted by Mira's trust in Bram (`0.8`). Next morning, Mira greets the player coldly referencing what Bram told her—without spending extra LLM tokens on background simulation.
 4. **Cozy Day -> Dungeon -> Raid Loop (Milestone 3):** Tend crops in the morning, accept a Guild bounty from Aldric, craft/upgrade with Pip and Bram, delve into the 3-floor dungeon with a pet or allied Lyra, and defend Oakhaven on Day 5 with allies earned through social play.
@@ -94,7 +94,7 @@ Purpose: Connect social state to the full cozy ARPG gameplay loop inside a compa
 
 - **Frame Rate & Thermals:** >= 30 FPS sustained on Low preset (30 FPS cap to avoid thermal throttling); >= 60 FPS on Medium/High on mid-tier devices.
 - **Memory & APK Size:** Keep release APK lean (< 100 MB for vertical slice; Milestone 1 baseline is 44 MB) and avoid GC spikes during gameplay (`Update`/`FixedUpdate` zero-alloc discipline).
-- **Offline Resilience:** Game must remain playable without network access (local save cache, graceful leaderboard degradation, deterministic/fallback dialogue when LLM endpoint is unreachable).
+- **Online-only (#37, user decision 2026-11-28):** Villagers depend on the AI, so the game requires internet. Startup gate: no gameplay until internet, UGS sign-in and the AI endpoint are reachable ("Connect to the internet to play" + Retry). Short drops are absorbed quietly (one retry, then built-in lines). After ~12 s of continuous trouble the game pauses behind "Reconnecting..." (day clock, timers and input frozen) and resumes automatically. The local save stays as a cache and crash safety; Cloud Save is the cross-device source (#33). There is no offline play mode.
 - **Security & Privacy:** Never ship LLM API keys in client builds or git commits; route production cloud LLM requests through a thin authenticated backend proxy or user-configured endpoint for dev builds.
 
 ---
