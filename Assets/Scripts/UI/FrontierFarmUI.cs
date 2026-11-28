@@ -144,6 +144,7 @@ namespace ProjectFrontier
             var loop = FrontierGameLoop.Instance;
             if (loop != null && loop.State != RunState.Running) return;
             if (loop != null && loop.DialogueOpen) loop.CloseDialogue(completeInteraction: true);
+            FrontierGuildUI.Instance?.Close();
 
             ActiveTab = tab;
             IsOpen = true;

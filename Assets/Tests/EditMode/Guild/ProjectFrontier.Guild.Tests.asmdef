@@ -1,0 +1,27 @@
+{
+    "name": "ProjectFrontier.Guild.Tests",
+    "rootNamespace": "ProjectFrontier.Guild.Tests",
+    "references": [
+        "ProjectFrontier.Guild",
+        "ProjectFrontier.Farm",
+        "ProjectFrontier.Social",
+        "ProjectFrontier.Llm",
+        "UnityEngine.TestRunner",
+        "UnityEditor.TestRunner"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "nunit.framework.dll"
+    ],
+    "autoReferenced": false,
+    "defineConstraints": [
+        "UNITY_INCLUDE_TESTS"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

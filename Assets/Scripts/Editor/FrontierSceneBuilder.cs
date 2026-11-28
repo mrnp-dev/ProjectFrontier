@@ -1,6 +1,7 @@
 #if UNITY_EDITOR
 using System.IO;
 using ProjectFrontier.Farm;
+using ProjectFrontier.Guild;
 using TMPro;
 using Unity.Cinemachine;
 using UnityEditor;
@@ -46,7 +47,7 @@ namespace ProjectFrontier.Editor
 
         private struct HomeSpotSprites
         {
-            public Sprite forge, tavern, guildHall, anvil, barrel, questBoard, herbStall;
+            public Sprite forge, tavern, guildHall, anvil, barrel, questBoard, herbStall, rankLedger, guildBanner;
         }
 
         private struct FarmSprites
@@ -95,7 +96,9 @@ namespace ProjectFrontier.Editor
                 anvil = SaveSpriteAsset("prop_anvil", PixelArtFactory.GetAnvilSprite()),
                 barrel = SaveSpriteAsset("prop_barrel", PixelArtFactory.GetBarrelSprite()),
                 questBoard = SaveSpriteAsset("prop_questboard", PixelArtFactory.GetQuestBoardSprite()),
-                herbStall = SaveSpriteAsset("prop_herbstall", PixelArtFactory.GetHerbStallSprite())
+                herbStall = SaveSpriteAsset("prop_herbstall", PixelArtFactory.GetHerbStallSprite()),
+                rankLedger = SaveSpriteAsset("prop_rankledger", PixelArtFactory.GetRankLedgerSprite()),
+                guildBanner = SaveSpriteAsset("prop_guildbanner", PixelArtFactory.GetGuildBannerSprite())
             };
             Sprite pine = SaveSpriteAsset("prop_pine", PixelArtFactory.GetPineTreeSprite());
             Sprite lanternPost = SaveSpriteAsset("prop_lanternpost", PixelArtFactory.GetLanternPostSprite());
@@ -164,6 +167,7 @@ namespace ProjectFrontier.Editor
             managersGo.AddComponent<FrontierLlmManager>();
             managersGo.AddComponent<FrontierDayCycleManager>();
             var farmMgr = managersGo.AddComponent<FrontierFarmManager>();
+            managersGo.AddComponent<FrontierGuildManager>();
             var impulseSrc = managersGo.AddComponent<CinemachineImpulseSource>();
             feelMgr.impulseSource = impulseSrc;
 
@@ -210,7 +214,7 @@ namespace ProjectFrontier.Editor
                 new Vector3(-3.2f, -1.4f, 0f),
                 new Vector3(3.4f, -1.4f, 0f),
                 new Vector3(-4.5f, 2.5f, 0f),
-                new Vector3(4.2f, 2.8f, 0f),
+                new Vector3(2.9f, 3.5f, 0f),
                 new Vector3(0f, -4.4f, 0f)
             };
             for (int i = 0; i < shardPositions.Length; i++)
@@ -285,7 +289,8 @@ namespace ProjectFrontier.Editor
             for (int y = -9; y <= 9; y++)
             for (int x = -26; x <= 15; x++)
             {
-                bool isPlaza = Mathf.Abs(x) <= 2 && Mathf.Abs(y) <= 2;
+                bool isPlaza = (Mathf.Abs(x) <= 2 && Mathf.Abs(y) <= 2)
+                    || (x >= 4 && x <= 9 && y >= 2 && y <= 4);
                 bool isCrossPath = (Mathf.Abs(x) <= 1 && y >= -7 && y <= 6)
                     || (Mathf.Abs(y) <= 1 && x >= -13 && x <= 10)
                     || ((y == 1 || y == 2) && x >= -22 && x <= -13);
@@ -318,8 +323,16 @@ namespace ProjectFrontier.Editor
             SpawnProp(propsRoot.transform, "Barrel_1", TavernPos + new Vector3(-2.2f, -0.9f, 0f), home.barrel, mat, sortOrder: 9, addCollider: true);
             SpawnProp(propsRoot.transform, "Barrel_2", TavernPos + new Vector3(-2.9f, -1.05f, 0f), home.barrel, mat, sortOrder: 9, addCollider: true);
 
-            SpawnProp(propsRoot.transform, "GuildHall_Aldric", GuildHallPos, home.guildHall, mat, sortOrder: 8, addCollider: true);
-            SpawnProp(propsRoot.transform, "QuestBoard", GuildHallPos + new Vector3(2.2f, -0.9f, 0f), home.questBoard, mat, sortOrder: 9, addCollider: true);
+            // Adventurers Guild Hall Precinct (NE): Guild Hall, interactive Quest Board, Rank Ledger podium, banners (#20)
+            var guildHallGo = SpawnProp(propsRoot.transform, "GuildHall_Aldric", GuildHallPos, home.guildHall, mat, sortOrder: 8, addCollider: true);
+            AddPointLight2D(guildHallGo.transform, new Vector3(0f, -1.1f, 0f), FrontierPalette.HearthGold, 1.05f, 3.6f);
+            var questBoardGo = SpawnProp(propsRoot.transform, "QuestBoard", GuildHallPos + new Vector3(2.2f, -0.9f, 0f), home.questBoard, mat, sortOrder: 9, addCollider: true);
+            AddPointLight2D(questBoardGo.transform, new Vector3(0f, 0.55f, 0f), FrontierPalette.HearthGold, 0.85f, 2.8f);
+            AttachStation(questBoardGo, HomesteadStationKind.GuildBoard, "BOUNTIES", 2.2f, unlitMat, new Vector3(0f, 1.2f, 0f));
+            var rankLedgerGo = SpawnProp(propsRoot.transform, "GuildRankLedger", GuildHallPos + new Vector3(-2.1f, -0.9f, 0f), home.rankLedger, mat, sortOrder: 9, addCollider: true);
+            AttachStation(rankLedgerGo, HomesteadStationKind.GuildLedger, "RANK", 2.0f, unlitMat, new Vector3(0f, 1.2f, 0f));
+            SpawnProp(propsRoot.transform, "GuildBanner_L", GuildHallPos + new Vector3(-2.5f, 0.7f, 0f), home.guildBanner, mat, sortOrder: 10, addCollider: false);
+            SpawnProp(propsRoot.transform, "GuildBanner_R", GuildHallPos + new Vector3(2.8f, 0.7f, 0f), home.guildBanner, mat, sortOrder: 10, addCollider: false);
 
             var forgeGo = SpawnProp(propsRoot.transform, "Forge_Bram", ForgePos, home.forge, mat, sortOrder: 12, addCollider: true);
             AddPointLight2D(forgeGo.transform, new Vector3(-0.5f, -0.9f, 0f), FrontierPalette.EmberOrange, 0.9f, 2.4f);
@@ -672,6 +685,9 @@ namespace ProjectFrontier.Editor
             // Homestead Satchel, Crafting Bench & Pip's Shop UI + Gold/Seed/Buff HUD strip (#19)
             BuildFarmUi(canvasGo, hudRoot.transform, uiSolid, uiPanel);
 
+            // Adventurers Guild Quest Board & Rank Ledger UI + top-left HUD Rank strip (#20)
+            BuildGuildUi(canvasGo, hudRoot.transform, uiSolid, uiPanel);
+
             // 3. PAUSE & GRAPHICS/AUDIO SETTINGS SCREEN
             var pauseRoot = CreateFullRect(canvasGo.transform, "PauseScreen");
             var pauseScrim = CreateImage(pauseRoot.transform, "PauseScrim", uiSolid, FrontierPalette.WithAlpha(FrontierPalette.InkDark, 0.72f), raycast: true);
@@ -851,10 +867,11 @@ namespace ProjectFrontier.Editor
             SetAnchored(deltaTxt.rectTransform, new Vector2(0f, 0.5f), new Vector2(1f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(112f, 0f), new Vector2(-772f, 28f));
             chatbox.deltaToastText = deltaTxt;
 
-            var shopBtn = CreateStyledButton(headerGo.transform, "ShopButton", uiPanel, "SHOP", 14f, FrontierPalette.HerbOlive, FrontierPalette.CreamParchment, out _);
+            var shopBtn = CreateStyledButton(headerGo.transform, "ShopButton", uiPanel, "SHOP", 14f, FrontierPalette.HerbOlive, FrontierPalette.CreamParchment, out var shopLbl);
             SetAnchored(shopBtn.GetComponent<RectTransform>(), new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), new Vector2(-180f, 0f), new Vector2(86f, 30f));
             shopBtn.gameObject.SetActive(false);
             chatbox.shopButton = shopBtn;
+            chatbox.shopButtonLabel = shopLbl;
 
             var moodBg = CreateImage(headerGo.transform, "MoodBadge", uiPanel, FrontierPalette.ForgeSoot, raycast: false);
             moodBg.type = UnityEngine.UI.Image.Type.Sliced;
@@ -1180,6 +1197,153 @@ namespace ProjectFrontier.Editor
             farmUi.tabCraftButton = tabCraft;
             farmUi.tabShopButton = tabShop;
             farmUi.contentContainer = contentRt;
+
+            modalRoot.SetActive(false);
+        }
+
+        private static void BuildGuildUi(GameObject canvasGo, Transform hudParent, Sprite uiSolid, Sprite uiPanel)
+        {
+            var guildUi = canvasGo.AddComponent<FrontierGuildUI>();
+            guildUi.panelSprite = uiPanel;
+            guildUi.solidSprite = uiSolid;
+            guildUi.tmpOutlineMaterial = AssetDatabase.LoadAssetAtPath<Material>("Assets/Art/Generated/TmpUiOutline.mat");
+
+            // 1. Compact HUD Guild Rank Strip + GUILD button (top-left, cleanly below GoalCard)
+            var rankStrip = CreateImage(hudParent, "HudGuildRankStrip", uiPanel, FrontierPalette.WithAlpha(FrontierPalette.SlatePanel, 0.90f), raycast: false);
+            rankStrip.type = UnityEngine.UI.Image.Type.Sliced;
+            SetAnchored(rankStrip.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(24f, -136f), new Vector2(312f, 38f));
+            var rankTxt = CreateStyledTmp(rankStrip.transform, "HudGuildRankText", "RANK: BRONZE · 0/100 XP", 14f, FrontierPalette.CreamParchment, TextAlignmentOptions.Center);
+            rankTxt.textWrappingMode = TextWrappingModes.NoWrap;
+            rankTxt.overflowMode = TextOverflowModes.Truncate;
+            rankTxt.enableAutoSizing = true;
+            rankTxt.fontSizeMin = 10f;
+            rankTxt.fontSizeMax = 14f;
+            rankTxt.characterSpacing = 1.4f;
+            StretchFill(rankTxt.rectTransform, 8f, 4f);
+            guildUi.hudRankSummaryText = rankTxt;
+
+            var guildBtn = CreateStyledButton(hudParent, "HudGuildButton", uiPanel, "GUILD", 16f, FrontierPalette.GuildNavy, FrontierPalette.HearthGold, out _);
+            SetAnchored(guildBtn.GetComponent<RectTransform>(), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(344f, -136f), new Vector2(110f, 38f));
+            guildUi.hudGuildButton = guildBtn;
+
+            // 2. Modal Shell (Adventurers Guild Quest Board / Active Contracts / Rank Ledger)
+            var modalRoot = CreateFullRect(hudParent, "GuildModal");
+            var modalScrim = CreateImage(modalRoot.transform, "GuildModalScrim", uiSolid, FrontierPalette.WithAlpha(FrontierPalette.InkDark, 0.72f), raycast: true);
+            StretchFill(modalScrim.rectTransform);
+
+            var modalCard = CreateImage(modalRoot.transform, "GuildModalCard", uiPanel, FrontierPalette.SlatePanel, raycast: true);
+            modalCard.type = UnityEngine.UI.Image.Type.Sliced;
+            SetAnchored(modalCard.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(780f, 520f));
+
+            // Header Row
+            var modalTitle = CreateStyledTmp(modalCard.transform, "GuildModalTitle", "ADVENTURERS GUILD · QUEST BOARD", 20f, FrontierPalette.HearthGold, TextAlignmentOptions.Left);
+            modalTitle.textWrappingMode = TextWrappingModes.NoWrap;
+            modalTitle.overflowMode = TextOverflowModes.Truncate;
+            modalTitle.enableAutoSizing = true;
+            modalTitle.fontSizeMin = 13f;
+            modalTitle.fontSizeMax = 20f;
+            SetAnchored(modalTitle.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(18f, -14f), new Vector2(490f, 36f));
+
+            var modalRank = CreateStyledTmp(modalCard.transform, "GuildModalRank", "BRONZE · 0 XP", 16f, FrontierPalette.CreamParchment, TextAlignmentOptions.Right);
+            modalRank.textWrappingMode = TextWrappingModes.NoWrap;
+            modalRank.enableAutoSizing = true;
+            modalRank.fontSizeMin = 11f;
+            modalRank.fontSizeMax = 16f;
+            SetAnchored(modalRank.rectTransform, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-72f, -14f), new Vector2(180f, 36f));
+
+            var modalClose = CreateStyledButton(modalCard.transform, "GuildModalCloseBtn", uiPanel, "X", 18f, FrontierPalette.WithAlpha(FrontierPalette.DuskAlert, 0.88f), FrontierPalette.CreamParchment, out _);
+            SetAnchored(modalClose.GetComponent<RectTransform>(), new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-14f, -12f), new Vector2(46f, 36f));
+
+            // Tab Bar
+            var tabsRow = new GameObject("GuildTabRow", typeof(RectTransform), typeof(HorizontalLayoutGroup));
+            tabsRow.transform.SetParent(modalCard.transform, false);
+            SetAnchored(tabsRow.GetComponent<RectTransform>(), new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -58f), new Vector2(-36f, 40f));
+            var tabHlg = tabsRow.GetComponent<HorizontalLayoutGroup>();
+            tabHlg.spacing = 10f;
+            tabHlg.childAlignment = TextAnchor.MiddleCenter;
+            tabHlg.childControlWidth = true;
+            tabHlg.childControlHeight = true;
+            tabHlg.childForceExpandWidth = true;
+            tabHlg.childForceExpandHeight = true;
+
+            var tabBoard = CreateStyledButton(tabsRow.transform, "TabBoardBtn", uiPanel, "BOARD", 16f, FrontierPalette.GuildNavy, FrontierPalette.CreamParchment, out _);
+            var tabActive = CreateStyledButton(tabsRow.transform, "TabActiveBtn", uiPanel, "ACTIVE", 16f, FrontierPalette.SlatePanel, FrontierPalette.CreamParchment, out _);
+            var tabRank = CreateStyledButton(tabsRow.transform, "TabRankBtn", uiPanel, "RANK", 16f, FrontierPalette.SlatePanel, FrontierPalette.CreamParchment, out _);
+
+            // Subheader
+            var subTxt = CreateStyledTmp(modalCard.transform, "GuildModalSubheader", "DAY 1 BOUNTIES · ACTIVE 0/2", 13f, FrontierPalette.CreamParchment, TextAlignmentOptions.Center);
+            subTxt.textWrappingMode = TextWrappingModes.NoWrap;
+            subTxt.overflowMode = TextOverflowModes.Truncate;
+            subTxt.enableAutoSizing = true;
+            subTxt.fontSizeMin = 10f;
+            subTxt.fontSizeMax = 13f;
+            SetAnchored(subTxt.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -104f), new Vector2(-36f, 24f));
+
+            // Scrollable Content Area
+            var scrollGo = new GameObject("GuildScrollView", typeof(RectTransform), typeof(UnityEngine.UI.Image), typeof(ScrollRect));
+            scrollGo.transform.SetParent(modalCard.transform, false);
+            var scrollRt = scrollGo.GetComponent<RectTransform>();
+            scrollRt.anchorMin = Vector2.zero;
+            scrollRt.anchorMax = Vector2.one;
+            scrollRt.offsetMin = new Vector2(18f, 44f);
+            scrollRt.offsetMax = new Vector2(-18f, -134f);
+            var scrollBg = scrollGo.GetComponent<UnityEngine.UI.Image>();
+            scrollBg.sprite = uiSolid;
+            scrollBg.color = FrontierPalette.WithAlpha(FrontierPalette.InkDark, 0.45f);
+            scrollBg.raycastTarget = true;
+
+            var viewportGo = new GameObject("Viewport", typeof(RectTransform), typeof(RectMask2D));
+            viewportGo.transform.SetParent(scrollGo.transform, false);
+            var viewportRt = viewportGo.GetComponent<RectTransform>();
+            StretchFill(viewportRt, 4f, 4f);
+
+            var contentGo = new GameObject("Content", typeof(RectTransform), typeof(VerticalLayoutGroup), typeof(ContentSizeFitter));
+            contentGo.transform.SetParent(viewportGo.transform, false);
+            var contentRt = contentGo.GetComponent<RectTransform>();
+            contentRt.anchorMin = new Vector2(0f, 1f);
+            contentRt.anchorMax = new Vector2(1f, 1f);
+            contentRt.pivot = new Vector2(0.5f, 1f);
+            contentRt.anchoredPosition = Vector2.zero;
+            contentRt.sizeDelta = Vector2.zero;
+            var vlg = contentGo.GetComponent<VerticalLayoutGroup>();
+            vlg.padding = new RectOffset(6, 6, 6, 6);
+            vlg.spacing = 6f;
+            vlg.childAlignment = TextAnchor.UpperCenter;
+            vlg.childControlWidth = true;
+            vlg.childControlHeight = true;
+            vlg.childForceExpandWidth = true;
+            vlg.childForceExpandHeight = false;
+            var fitter = contentGo.GetComponent<ContentSizeFitter>();
+            fitter.horizontalFit = ContentSizeFitter.FitMode.Unconstrained;
+            fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+
+            var scrollRect = scrollGo.GetComponent<ScrollRect>();
+            scrollRect.viewport = viewportRt;
+            scrollRect.content = contentRt;
+            scrollRect.horizontal = false;
+            scrollRect.vertical = true;
+            scrollRect.movementType = ScrollRect.MovementType.Clamped;
+            scrollRect.scrollSensitivity = 24f;
+
+            // Footer Feedback Toast
+            var toastTxt = CreateStyledTmp(modalCard.transform, "GuildFeedbackToast", string.Empty, 14f, FrontierPalette.HearthGold, TextAlignmentOptions.Center);
+            toastTxt.textWrappingMode = TextWrappingModes.NoWrap;
+            toastTxt.overflowMode = TextOverflowModes.Truncate;
+            toastTxt.enableAutoSizing = true;
+            toastTxt.fontSizeMin = 11f;
+            toastTxt.fontSizeMax = 14f;
+            SetAnchored(toastTxt.rectTransform, new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 10f), new Vector2(-36f, 28f));
+
+            guildUi.modalRoot = modalRoot;
+            guildUi.modalTitleText = modalTitle;
+            guildUi.modalRankBadgeText = modalRank;
+            guildUi.modalSubheaderText = subTxt;
+            guildUi.feedbackToastText = toastTxt;
+            guildUi.closeButton = modalClose;
+            guildUi.tabBoardButton = tabBoard;
+            guildUi.tabActiveButton = tabActive;
+            guildUi.tabRankButton = tabRank;
+            guildUi.contentContainer = contentRt;
 
             modalRoot.SetActive(false);
         }

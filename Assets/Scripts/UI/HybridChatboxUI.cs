@@ -29,6 +29,7 @@ namespace ProjectFrontier
         public Image moodBadgeBackground;
         public TextMeshProUGUI moodBadgeText;
         public Button shopButton;
+        public TextMeshProUGUI shopButtonLabel;
         public Button closeButton;
 
         [Header("Portrait")]
@@ -142,7 +143,18 @@ namespace ProjectFrontier
             }
             RefreshStandingBadge();
             if (shopButton != null)
-                shopButton.gameObject.SetActive(string.Equals(npc.NpcId, "pip", StringComparison.OrdinalIgnoreCase));
+            {
+                bool isPip = string.Equals(npc.NpcId, "pip", StringComparison.OrdinalIgnoreCase);
+                bool isAldric = string.Equals(npc.NpcId, "aldric", StringComparison.OrdinalIgnoreCase);
+                shopButton.gameObject.SetActive(isPip || isAldric);
+                if (isPip || isAldric)
+                {
+                    if (shopButton.targetGraphic != null)
+                        shopButton.targetGraphic.color = isAldric ? FrontierPalette.GuildNavy : FrontierPalette.HerbOlive;
+                    TextMeshProUGUI lbl = shopButtonLabel != null ? shopButtonLabel : shopButton.GetComponentInChildren<TextMeshProUGUI>();
+                    if (lbl != null) lbl.text = isAldric ? "GUILD" : "SHOP";
+                }
+            }
             if (deltaToastText != null) deltaToastText.text = string.Empty;
 
             ApplyPortrait(npc);
@@ -548,7 +560,12 @@ namespace ProjectFrontier
 
         private void HandleShopClicked()
         {
-            if (FrontierFarmUI.Instance != null)
+            bool isAldric = _activeNpc != null && string.Equals(_activeNpc.NpcId, "aldric", StringComparison.OrdinalIgnoreCase);
+            if (isAldric && FrontierGuildUI.Instance != null)
+            {
+                FrontierGuildUI.Instance.Open(GuildModalTab.Board);
+            }
+            else if (!isAldric && FrontierFarmUI.Instance != null)
             {
                 FrontierFarmUI.Instance.Open(FarmModalTab.PipShop);
             }
