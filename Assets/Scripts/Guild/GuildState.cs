@@ -340,6 +340,12 @@ namespace ProjectFrontier.Guild
 
         public bool CanTurnIn(string bountyId, InventoryState inv, out string reason)
         {
+            if (inv == null)
+            {
+                // Rewards are paid into the inventory; never complete a contract that cannot pay out.
+                reason = "INVENTORY UNAVAILABLE";
+                return false;
+            }
             ActiveBountyRecord rec = FindActive(bountyId);
             if (rec == null)
             {
@@ -396,7 +402,7 @@ namespace ProjectFrontier.Guild
             GuildRank newRank = Rank;
             bool rankedUp = newRank > prevRank;
 
-            inv?.AddGold(def.GoldReward);
+            inv.AddGold(def.GoldReward);
 
             if (social != null)
             {

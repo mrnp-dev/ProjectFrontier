@@ -1,4 +1,5 @@
 using System;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using ProjectFrontier.Llm;
@@ -66,10 +67,12 @@ namespace ProjectFrontier.Guild
                 "You write terse, grounded 1-sentence Adventurers Guild board notices signed by Captain Aldric in Oakhaven. " +
                 "Reply ONLY as JSON: {\"flavor\":\"...\"}. Under 140 characters. Never state gold, XP, counts, or rank requirements."));
 
+            // Counts, days and rewards stay in C#: the model gets a number-free task so a notice can never
+            // contradict the card. Output containing digits is rejected in ParseFlavor as a second guard.
             string sponsor = GuildCatalog.GetSponsorDisplayName(bounty.SponsorNpcId);
-            string extra = string.IsNullOrWhiteSpace(townHint) ? string.Empty : $" | Context: {townHint.Trim()}";
+            string extra = string.IsNullOrWhiteSpace(townHint) ? string.Empty : $" | Context: {StripNumbers(townHint)}";
             req.Messages.Add(new ChatMessage(ChatRole.User,
-                $"Day {Math.Max(1, day)} | Recruit rank: {GuildCatalog.GetRankShortLabel(rank)} | Title: {bounty.Title} | Task: {bounty.ObjectiveSummary} | Sponsor: {sponsor}{extra}. Write the board notice."));
+                $"Rank: {GuildCatalog.GetRankShortLabel(rank)} | Title: {StripNumbers(bounty.Title)} | Task: {StripNumbers(bounty.ObjectiveSummary)} | Sponsor: {sponsor}{extra}. Write the board notice."));
             int est = 0;
             for (int i = 0; i < req.Messages.Count; i++) est += TokenEstimator.Estimate(req.Messages[i]);
             req.EstimatedInputTokens = est;
@@ -117,9 +120,21 @@ namespace ProjectFrontier.Guild
             }
         }
 
+        private static readonly Regex CountPattern = new Regex(@"\d+\s*[xX×]?\s*", RegexOptions.Compiled);
+
+        /// <summary>Removes counts like "2x" / "3 " so the prompt carries no gameplay numbers.</summary>
+        public static string StripNumbers(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text)) return string.Empty;
+            string s = CountPattern.Replace(text, string.Empty).Trim();
+            while (s.Contains("  ")) s = s.Replace("  ", " ");
+            return s;
+        }
+
         /// <summary>
-        /// Extracts and sanitizes flavor copy from JSON (<c>{"flavor":"..."}</c>, code-fenced or raw)
-        /// or short plain text fallback. Rejects empty, overly short, or error-like strings.
+        /// Extracts and sanitizes flavor copy from JSON (<c>{"flavor":"..."}</c>, raw or code-fenced).
+        /// Rejects anything that is not that JSON shape, empty/short text, and any text containing digits
+        /// (numbers are C#-only), so the caller falls back to the static description.
         /// </summary>
         public static string ParseFlavor(string raw)
         {
@@ -146,7 +161,7 @@ namespace ProjectFrontier.Guild
                 return null;
             }
 
-            return Sanitize(s);
+            return null;   // no JSON object: refusals / meta chatter fall back to static copy
         }
 
         private static string StripCodeFences(string text)
@@ -165,6 +180,8 @@ namespace ProjectFrontier.Guild
             string cleaned = input.Replace((char)13, ' ').Replace((char)10, ' ').Trim().Trim((char)34, (char)39);
             while (cleaned.Contains("  ")) cleaned = cleaned.Replace("  ", " ");
             if (cleaned.Length < 12) return null;
+            for (int i = 0; i < cleaned.Length; i++)
+                if (char.IsDigit(cleaned[i])) return null;
             if (cleaned.Length > MaxFlavorChars)
             {
                 int maxBody = MaxFlavorChars - 3;

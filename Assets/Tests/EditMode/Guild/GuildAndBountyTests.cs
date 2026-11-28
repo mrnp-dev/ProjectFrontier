@@ -111,8 +111,10 @@ namespace ProjectFrontier.Guild.Tests
             Assert.IsTrue(guild.TryAbandon(GuildCatalog.BountyTavernCheck, social, out _));
             Assert.AreEqual(0, guild.ActiveBounties.Count);
             Assert.AreEqual(1, guild.AbandonedCount);
-            Assert.Less(social.Get("aldric").Trust, 0);
-            Assert.Less(social.Get("aldric").Respect, 0);
+            Assert.AreEqual(GuildState.AbandonAldricTrustPenalty, social.Get("aldric").Trust);
+            Assert.AreEqual(GuildState.AbandonAldricRespectPenalty, social.Get("aldric").Respect);
+            Assert.AreEqual(-3, social.Get("aldric").Trust);
+            Assert.AreEqual(-4, social.Get("aldric").Respect);
 
             // Spreads negatively via evening gossip
             GossipEngine.RunExchange(social, trust, new IReadOnlyList<string>[] { new[] { "bram", "mira", "aldric" } });
@@ -216,6 +218,118 @@ namespace ProjectFrontier.Guild.Tests
             restored.LoadFrom(saved, 2);
             Assert.AreEqual(1, restored.CachedFlavorCount);
             Assert.IsTrue(restored.TryGetCachedFlavor(2, GuildCatalog.BountyHomesteadHarvest, out _));
+        }
+
+        [Test]
+        public void ContractCap_FreesSlot_AfterTurnInOrAbandon()
+        {
+            var guild = new GuildState(initialDay: 1);
+            var inv = new InventoryState(seedStarterKit: true);
+            var social = new SocialState();
+            inv.AddItem(ItemCatalog.HerbMoonmint, 2);
+
+            Assert.IsTrue(guild.TryAccept(GuildCatalog.BountyMoonmintSupplies, 1, out _));
+            Assert.IsTrue(guild.TryAccept(GuildCatalog.BountyHomesteadHarvest, 1, out _));
+            Assert.IsFalse(guild.TryAccept(GuildCatalog.BountyTavernCheck, 1, out string full));
+            StringAssert.Contains("MAX", full);
+
+            Assert.IsTrue(guild.TryTurnIn(GuildCatalog.BountyMoonmintSupplies, inv, social, out _));
+            Assert.IsTrue(guild.TryAccept(GuildCatalog.BountyTavernCheck, 1, out _), "Turn-in must free a slot");
+
+            Assert.IsTrue(guild.TryAbandon(GuildCatalog.BountyHomesteadHarvest, social, out _));
+            Assert.AreEqual(1, guild.ActiveBounties.Count, "Abandon must free a slot");
+        }
+
+        [Test]
+        public void TurnIn_WithoutInventory_FailsAndKeepsContract()
+        {
+            var guild = new GuildState(initialDay: 1);
+            Assert.IsTrue(guild.TryAccept(GuildCatalog.BountyHomesteadHarvest, 1, out _));
+            guild.RecordProgress(BountyObjectiveKind.HarvestCrops, null, 5);
+
+            Assert.IsFalse(guild.TryTurnIn(GuildCatalog.BountyHomesteadHarvest, null, new SocialState(), out BountyTurnInResult r));
+            Assert.IsFalse(r.Succeeded);
+            Assert.IsTrue(guild.IsActive(GuildCatalog.BountyHomesteadHarvest));
+            Assert.AreEqual(0, guild.GuildXp);
+            Assert.AreEqual(0, guild.CompletedCount);
+        }
+
+        [Test]
+        public void FlavorRequest_IsTokenCapped_AndCarriesNoNumbers()
+        {
+            foreach (BountyDef def in GuildCatalog.AllBounties)
+            {
+                LlmRequest req = BountyFlavorService.BuildRequest(def, 17, GuildRank.Silver, "Aldric standing: Friendly");
+                Assert.AreEqual(96, req.MaxTokens);
+                Assert.AreEqual(BountyFlavorService.MaxFlavorTokens, req.MaxTokens);
+                string user = req.Messages[req.Messages.Count - 1].Content;
+                foreach (char c in user)
+                    Assert.IsFalse(char.IsDigit(c), $"{def.Id} prompt leaks a number: {user}");
+            }
+            Assert.AreEqual("Deliver Moonmint", BountyFlavorService.StripNumbers("Deliver 2x Moonmint"));
+        }
+
+        [Test]
+        public void ParseFlavor_RequiresJsonShape_AndRejectsDigits()
+        {
+            Assert.IsNull(BountyFlavorService.ParseFlavor("I'm sorry, I can't write that notice for you."));
+            Assert.IsNull(BountyFlavorService.ParseFlavor("{\"flavor\":\"Bring 3 bundles of moonmint to the gate.\"}"));
+            Assert.AreEqual("Bring moonmint bundles to the east gate.",
+                BountyFlavorService.ParseFlavor("{\"flavor\":\"Bring moonmint bundles to the east gate.\"}"));
+        }
+
+        [Test]
+        public void FlavorService_FallsBack_WhenNoNetwork_WithoutCallingProvider()
+        {
+            BountyDef def = GuildCatalog.GetBounty(GuildCatalog.BountyMoonmintSupplies);
+            int calls = 0;
+            var provider = new FakeOnlineProvider((req, ct) => { calls++; return Task.FromResult(new LlmCompletion { Text = "{}" }); });
+            var svc = new BountyFlavorService(provider, () => false, 2f);
+            BountyFlavorResult res = svc.GenerateFlavorAsync(def, 1, GuildRank.Bronze).GetAwaiter().GetResult();
+            Assert.IsTrue(res.UsedFallback);
+            Assert.AreEqual("no network", res.FallbackReason);
+            Assert.AreEqual(def.StaticDescription, res.Text);
+            Assert.AreEqual(0, calls);
+        }
+
+        [Test]
+        public void FlavorService_TimesOut_ToStaticDescription()
+        {
+            BountyDef def = GuildCatalog.GetBounty(GuildCatalog.BountyMoonmintSupplies);
+            var hanging = new FakeOnlineProvider(async (req, ct) =>
+            {
+                await Task.Delay(Timeout.Infinite, ct);
+                return new LlmCompletion { Text = "{\"flavor\":\"never arrives in time at all\"}" };
+            });
+            var svc = new BountyFlavorService(hanging, () => true, 0.5f);   // clamped minimum
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            // Run off the Unity sync context so the awaited continuation can't deadlock the test thread.
+            BountyFlavorResult res = Task.Run(() => svc.GenerateFlavorAsync(def, 1, GuildRank.Bronze)).GetAwaiter().GetResult();
+            sw.Stop();
+            Assert.IsTrue(res.UsedFallback);
+            Assert.AreEqual("timeout", res.FallbackReason);
+            Assert.AreEqual(def.StaticDescription, res.Text);
+            Assert.Less(sw.Elapsed.TotalSeconds, 5.0);
+        }
+
+        [Test]
+        public void CloudReconcile_NewestWins_AndNeverOverwritesUnreadCloud()
+        {
+            // Load failed / not signed in: never write.
+            Assert.AreEqual(GuildReconcileAction.Retry, GuildCloudSync.Decide(false, false, 0, 500, true));
+            // Cloud newer, quiet session (e.g. reinstall): adopt cloud.
+            Assert.AreEqual(GuildReconcileAction.AdoptCloud, GuildCloudSync.Decide(true, true, 900, 0, false));
+            Assert.AreEqual(GuildReconcileAction.AdoptCloud, GuildCloudSync.Decide(true, true, 900, 500, false));
+            // Local newer: push it up.
+            Assert.AreEqual(GuildReconcileAction.PushLocal, GuildCloudSync.Decide(true, true, 500, 900, false));
+            // No cloud yet: push existing local, nothing to do for a pristine install.
+            Assert.AreEqual(GuildReconcileAction.PushLocal, GuildCloudSync.Decide(true, false, 0, 500, false));
+            Assert.AreEqual(GuildReconcileAction.InSync, GuildCloudSync.Decide(true, false, 0, 0, false));
+            // Dirty session: in-session progress is kept and pushed even if cloud is newer.
+            Assert.AreEqual(GuildReconcileAction.PushLocal, GuildCloudSync.Decide(true, true, 900, 500, true));
+            Assert.AreEqual(GuildReconcileAction.PushLocal, GuildCloudSync.Decide(true, false, 0, 0, true));
+            // Same snapshot: nothing to move.
+            Assert.AreEqual(GuildReconcileAction.InSync, GuildCloudSync.Decide(true, true, 500, 500, false));
         }
     }
 }
