@@ -135,7 +135,15 @@ namespace ProjectFrontier
         public IReadOnlyList<ChatMessage> GetHistory(string npcId) =>
             _history.TryGetValue(npcId, out var h) ? h : (IReadOnlyList<ChatMessage>)Array.Empty<ChatMessage>();
 
-        public void ClearAllHistory() => _history.Clear();
+        public void ClearAllHistory()
+        {
+            _history.Clear();
+            _transcripts.Clear();
+        }
+
+        /// <summary>The whole current conversation with a villager, as the memory extractor will see it (#45).</summary>
+        public IReadOnlyList<ChatMessage> GetTranscript(string npcId) =>
+            _transcripts.TryGetValue(npcId, out var t) ? t : (IReadOnlyList<ChatMessage>)Array.Empty<ChatMessage>();
 
         [Header("Long-term memory (#42)")]
         [Tooltip("After a conversation closes, one small LLM call extracts 0-3 facts the villager keeps across days.")]
@@ -156,40 +164,119 @@ namespace ProjectFrontier
         /// <summary>Conversation over: extract memories from each chat (async, best effort), then forget the short-term history.</summary>
         private void HandleDialogueClosed()
         {
-            var finished = new List<KeyValuePair<string, List<ChatMessage>>>(_history);
+            var finished = new List<KeyValuePair<string, List<ChatMessage>>>(_transcripts);
             ClearAllHistory();
             if (!extractMemories) return;
-            foreach (var kv in finished) _ = ExtractAndRetainAsync(kv.Key, kv.Value);
+            int day = CurrentDay();
+            foreach (var kv in finished)
+            {
+                _lastMood.TryGetValue(kv.Key, out string mood);
+                _ = RunPendingSafelyAsync(new PendingExtraction { NpcId = kv.Key, Conversation = kv.Value, Day = day, Mood = mood }, false);
+            }
         }
+
+        [Tooltip("Whole-conversation transcript kept per villager for memory extraction (#45). The opening exchange is " +
+                 "always kept; the extractor fits the rest into its 1200-character cap.")]
+        public int storedTranscriptMessages = 80;
+        private const int TranscriptOpeningMessages = 2;
+        private const float DrainCheckSeconds = 1f;
+
+        private readonly Dictionary<string, List<ChatMessage>> _transcripts = new Dictionary<string, List<ChatMessage>>();
+        private readonly MemoryExtractionQueue _pending = new MemoryExtractionQueue();
+        private bool _draining;
+        private float _drainTimer;
+
+        /// <summary>Extractions waiting for the connection to come back (#45). In memory only.</summary>
+        public MemoryExtractionQueue PendingExtractions => _pending;
 
         /// <summary>
         /// Runs the after-conversation extraction for one villager and stores the facts. Public so verification
         /// scripts can drive it directly; returns null if the manager was destroyed or the call was cancelled.
+        /// A no-connection failure is queued and retried once the connection is back (#45).
         /// </summary>
-        public async Task<MemoryExtractionResult> ExtractAndRetainAsync(string npcId, IReadOnlyList<ChatMessage> conversation)
+        public Task<MemoryExtractionResult> ExtractAndRetainAsync(string npcId, IReadOnlyList<ChatMessage> conversation)
         {
-            LlmRequest request = MemoryExtractor.BuildRequest(npcId, DisplayNameOf(npcId), conversation);
+            if (conversation == null) return Task.FromResult<MemoryExtractionResult>(null);
+            _lastMood.TryGetValue(npcId ?? string.Empty, out string mood);
+            var item = new PendingExtraction { NpcId = npcId, Conversation = new List<ChatMessage>(conversation), Day = CurrentDay(), Mood = mood };
+            return RunPendingSafelyAsync(item, false);
+        }
+
+        /// <summary>Fire-and-forget safe: an early throw is logged as a warning instead of vanishing (#45).</summary>
+        private Task<MemoryExtractionResult> RunPendingSafelyAsync(PendingExtraction item, bool fromQueue) =>
+            MemoryExtractionQueue.RunSafelyAsync(() => RunPendingAsync(item, fromQueue), msg => Debug.LogWarning(msg));
+
+        private async Task<MemoryExtractionResult> RunPendingAsync(PendingExtraction item, bool fromQueue)
+        {
+            LlmRequest request = MemoryExtractor.BuildRequest(item.NpcId, DisplayNameOf(item.NpcId), item.Conversation);
             if (request == null) return null;
-            var social = FrontierSocialManager.Instance;
-            int day = social != null ? social.State.Day : 1;
-            _lastMood.TryGetValue(npcId, out string mood);
             try
             {
-                MemoryExtractionResult r = await MemoryExtractor.RunAsync(Service.Primary, request, day,
-                    Mathf.Max(Config.timeoutSeconds, 8f), _lifetime.Token, mood);
+                MemoryExtractionResult r = await MemoryExtractor.RunAsync(Service.Primary, request, item.Day,
+                    Mathf.Max(Config.timeoutSeconds, 8f), _lifetime.Token, item.Mood, FrontierConnectionManager.AllowsNetworkCalls);
                 if (this == null) return null;
-                if (r.CalledProvider)
+                if (r.CountsTowardUsage)
                     Service.Usage.RecordFeature(MemoryExtractor.FeatureTag, r.PromptTokens, r.CompletionTokens, r.Error != null);
+                var social = FrontierSocialManager.Instance;
                 if (social != null) social.RetainMemories(r.Facts);
+                string note = string.Empty;
+                if (MemoryExtractionQueue.ShouldQueue(r))
+                {
+                    MemoryExtractionQueue.Outcome outcome = _pending.Complete(item, r, fromQueue);
+                    note = outcome == MemoryExtractionQueue.Outcome.Requeued
+                        ? $" [queued until online, {_pending.Count} waiting, try {item.Attempts}/{_pending.MaxAttempts}]"
+                        : " [dropped after retries]";
+                }
                 string tpd = LlmTurnService.IsTpdCap(r.Error) ? " [tpd_cap]" : string.Empty;
-                Debug.Log($"[Memory] extract {npcId}: {MemoryExtractor.Describe(r)}{tpd} | {MemoryExtractor.FeatureTag} {Service.Usage.GetFeature(MemoryExtractor.FeatureTag)}");
-                MemoriesExtracted?.Invoke(npcId, r);
+                Debug.Log($"[Memory] extract {item.NpcId}: {MemoryExtractor.Describe(r)}{tpd}{note} | {MemoryExtractor.FeatureTag} {Service.Usage.GetFeature(MemoryExtractor.FeatureTag)}");
+                MemoriesExtracted?.Invoke(item.NpcId, r);
                 return r;
             }
             catch (OperationCanceledException)
             {
                 return null;
             }
+        }
+
+        private void Update()
+        {
+            if (_pending.Count == 0 || _draining) return;
+            _drainTimer -= Time.unscaledDeltaTime;
+            if (_drainTimer > 0f) return;
+            _drainTimer = DrainCheckSeconds;
+            if (IsConnectionOnline()) _ = DrainPendingAsync();
+        }
+
+        /// <summary>Runs queued extractions one at a time while the connection stays Online (#45).</summary>
+        private async Task DrainPendingAsync()
+        {
+            _draining = true;
+            try
+            {
+                while (this != null && _pending.Count > 0 && IsConnectionOnline())
+                {
+                    PendingExtraction item = _pending.TakeNext();
+                    MemoryExtractionResult r = await RunPendingSafelyAsync(item, true);
+                    if (MemoryExtractionQueue.ShouldQueue(r)) break; // dropped again: wait for the next Online
+                }
+            }
+            finally
+            {
+                _draining = false;
+            }
+        }
+
+        private static bool IsConnectionOnline()
+        {
+            var m = FrontierConnectionManager.Instance;
+            if (m != null && m.Monitor != null) return m.Monitor.State == ProjectFrontier.Net.ConnectionState.Online;
+            return FrontierConnectionManager.AllowsNetworkCalls;
+        }
+
+        private static int CurrentDay()
+        {
+            var social = FrontierSocialManager.Instance;
+            return social != null ? social.State.Day : 1;
         }
 
         /// <summary>
@@ -237,7 +324,7 @@ namespace ProjectFrontier
 #endif
                 _lastMood[npcId] = result.Mood;
                 if (recalled.Count > 0)
-                    Debug.Log($"[Memory] {npcId} recalled {recalled.Count}: " + string.Join(" | ", recalled.ConvertAll(m => m.text)));
+                    MemoryLog.Text($"[Memory] {npcId} recalled {recalled.Count}: " + string.Join(" | ", recalled.ConvertAll(m => m.text)));   // dev-only (#45)
 
                 if (social != null && !result.Deltas.IsZero)
                     result.AppliedDeltas = social.ApplyDelta(npcId, result.Deltas, DeltaSource.LlmTurn).Applied;
@@ -263,6 +350,12 @@ namespace ProjectFrontier
             list.Add(message);
             int overflow = list.Count - Mathf.Max(2, storedHistoryMessages);
             if (overflow > 0) list.RemoveRange(0, overflow);
+
+            // Whole conversation for memory extraction (#45): bounded, keeping the opening exchange.
+            if (!_transcripts.TryGetValue(npcId, out var transcript)) _transcripts[npcId] = transcript = new List<ChatMessage>();
+            transcript.Add(message);
+            int cap = Mathf.Max(TranscriptOpeningMessages + 2, storedTranscriptMessages);
+            if (transcript.Count > cap) transcript.RemoveRange(TranscriptOpeningMessages, transcript.Count - cap);
         }
 
         /// <summary>Live "Now:" line: day, phase, where this villager is per the schedule, and lantern progress.</summary>
