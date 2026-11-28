@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
 using ProjectFrontier.Llm;
+using ProjectFrontier.Net;
 using ProjectFrontier.Social;
 using ProjectFrontier.World;
 using UnityEngine;
@@ -45,13 +46,12 @@ namespace ProjectFrontier
         private readonly Dictionary<VillageSpot, List<string>> _spotGroups = new Dictionary<VillageSpot, List<string>>();
         private readonly List<IReadOnlyList<string>> _groupList = new List<IReadOnlyList<string>>(5);
         private FrontierDayCycleManager _dayCycle;
-        public string LastSaveStatus { get; private set; } = "Local cache";
+        public string LastSaveStatus => _cloud != null ? _cloud.LastStatus : "Local cache";
 
         private string _localPath;
         private bool _dirty;
         private long _localSavedAt;
-        private float _lastCloudSaveTime = -999f;
-        private bool _cloudSaveInFlight;
+        private CloudSyncGate<SocialSaveData> _cloud;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         private static void ResetStatics()
@@ -71,6 +71,7 @@ namespace ProjectFrontier
             SocialSaveData local = ReadLocal();
             State.LoadFrom(local);
             _localSavedAt = local?.savedAtUnixMs ?? 0;
+            _cloud = CreateCloudGate(_localSavedAt);
             State.RelationshipChanged += HandleRelationshipChanged;
         }
 
@@ -79,7 +80,7 @@ namespace ProjectFrontier
             if (FrontierGameLoop.Instance != null) FrontierGameLoop.Instance.DialogueClosed += HandleDialogueClosed;
             _dayCycle = FrontierDayCycleManager.Instance;
             if (_dayCycle != null) _dayCycle.PhaseChanged += HandlePhaseChanged;
-            await ReconcileWithCloudAsync();
+            await _cloud.ReconcileAsync();   // retried from Update until a read succeeds (#48)
         }
 
         private void OnDestroy()
@@ -213,52 +214,49 @@ namespace ProjectFrontier
 
         // ------------------------------------------------------------------ persistence
 
+        /// <summary>
+        /// Writes the local file synchronously (source of truth on this device) and asks the cloud gate for a write.
+        /// The gate blocks cloud writes until the cloud copy has been read (#48), so a sign-in that only succeeds on
+        /// the startup gate's Retry can never push local state over newer cloud progress.
+        /// </summary>
         public void SaveNow(bool forceCloud)
         {
             SocialSaveData snapshot = State.ToSaveData(DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
             WriteLocal(snapshot);
             _localSavedAt = snapshot.savedAtUnixMs;
             _dirty = false;
-
-            bool due = forceCloud || Time.realtimeSinceStartup - _lastCloudSaveTime >= cloudSaveIntervalSeconds;
-            if (due) _ = SaveCloudAsync(snapshot);
+            _cloud?.RequestWrite(forceCloud);
         }
 
-        private async Task SaveCloudAsync(SocialSaveData snapshot)
+        /// <summary>Read-before-write cloud gate for the "social" slot (#48).</summary>
+        public CloudSyncGate<SocialSaveData> CloudGate => _cloud;
+        public bool IsCloudReconciled => _cloud != null && _cloud.IsReconciled;
+
+        private CloudSyncGate<SocialSaveData> CreateCloudGate(long startupLocalSavedAt) =>
+            new CloudSyncGate<SocialSaveData>("Social",
+                () => PlayerSave.TryLoadAsync<SocialSaveData>(CloudKey),
+                data => PlayerSave.SaveAsync(CloudKey, data),
+                () => State.ToSaveData(_localSavedAt),
+                data => data.savedAtUnixMs,
+                AdoptCloud,
+                LiveOpsAllowsWrites,
+                () => Time.realtimeSinceStartup,
+                startupLocalSavedAt,
+                cloudSaveIntervalSeconds,
+                () => this != null,
+                msg => Debug.LogWarning(msg));
+
+        /// <summary>The cloud copy is newer than the save this device booted from: load it (#48, same rule as Guild).</summary>
+        private void AdoptCloud(SocialSaveData cloud)
         {
-            if (_cloudSaveInFlight || !LiveOpsAllowsWrites()) return;
-            _cloudSaveInFlight = true;
-            _lastCloudSaveTime = Time.realtimeSinceStartup;
-            try
-            {
-                bool ok = await PlayerSave.SaveAsync(CloudKey, snapshot);
-                LastSaveStatus = ok ? "Cloud synced" : "Local cache";
-            }
-            finally
-            {
-                _cloudSaveInFlight = false;
-            }
+            State.LoadFrom(cloud);
+            WriteLocal(cloud);
+            _localSavedAt = cloud.savedAtUnixMs;
+            _dirty = false;
+            Debug.Log("[Social] Progress restored from cloud.");
         }
 
-        /// <summary>Newest snapshot wins. Cloud data never overwrites unsaved in-session changes.</summary>
-        private async Task ReconcileWithCloudAsync()
-        {
-            if (!LiveOpsAllowsWrites()) return;
-            SocialSaveData cloud = await PlayerSave.LoadAsync<SocialSaveData>(CloudKey, null);
-            if (this == null) return;
-
-            if (cloud != null && !_dirty && cloud.savedAtUnixMs > _localSavedAt)
-            {
-                State.LoadFrom(cloud);
-                WriteLocal(cloud);
-                _localSavedAt = cloud.savedAtUnixMs;
-                LastSaveStatus = "Cloud synced";
-            }
-            else if (_localSavedAt > 0 && (cloud == null || _localSavedAt > cloud.savedAtUnixMs))
-            {
-                SaveNow(forceCloud: true);   // this device is ahead: push it up
-            }
-        }
+        private void Update() => _cloud?.Tick();
 
         private static bool LiveOpsAllowsWrites() =>
             FrontierLiveManager.Instance == null || FrontierLiveManager.Instance.LiveOpsEnabled;

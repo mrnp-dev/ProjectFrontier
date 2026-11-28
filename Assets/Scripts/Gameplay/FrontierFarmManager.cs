@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Threading.Tasks;
 using ProjectFrontier.Farm;
+using ProjectFrontier.Net;
 using ProjectFrontier.Social;
 using ProjectFrontier.World;
 using UnityEngine;
@@ -46,7 +47,9 @@ namespace ProjectFrontier
 
         public ChunkedFarmGrid Grid { get; private set; }
         public InventoryState Inventory { get; private set; }
-        public string LastSaveStatus { get; private set; } = "Local cache";
+        public string LastSaveStatus => _cloud != null ? _cloud.LastStatus : "Local cache";
+        /// <summary>True when farm/inventory changed since the last local save.</summary>
+        public bool HasUnsavedChanges => _dirty;
 
         public long NowUnixMs => DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + _debugClockOffsetMs;
         public int CurrentDay => FrontierDayCycleManager.Instance != null
@@ -63,8 +66,7 @@ namespace ProjectFrontier
         private string _localPath;
         private bool _dirty;
         private long _localSavedAt;
-        private float _lastCloudSaveTime = -999f;
-        private bool _cloudSaveInFlight;
+        private CloudSyncGate<FarmSaveData> _cloud;
         private long _debugClockOffsetMs;
         private float _buffPruneTimer;
 
@@ -95,6 +97,7 @@ namespace ProjectFrontier
                 Grid.LoadFromSaveData(local.plots);
                 _localSavedAt = local.savedAtUnixMs;
             }
+            _cloud = CreateCloudGate(_localSavedAt);
 
             Grid.PlotChanged += HandlePlotChanged;
             Inventory.Changed += HandleInventoryChanged;
@@ -117,7 +120,7 @@ namespace ProjectFrontier
                 // Re-sync against synced day count in case DayClock synced after Awake.
                 if (Grid.CatchUpAll(CurrentDay, NowUnixMs) > 0) _dirty = true;
             }
-            await ReconcileWithCloudAsync();
+            await _cloud.ReconcileAsync();   // retried from Update until a read succeeds (#48)
         }
 
         private void OnDestroy()
@@ -135,6 +138,7 @@ namespace ProjectFrontier
 
         private void Update()
         {
+            _cloud?.Tick();   // retries the cloud read until it succeeds, then any pending write (#48)
             // Zero per-frame crop ticks! Only prune active potion buffs at 1 Hz when a buff is running.
             if (Inventory == null || Inventory.ActiveBuffs.Count == 0) return;
             _buffPruneTimer += Time.unscaledDeltaTime;
@@ -609,61 +613,63 @@ namespace ProjectFrontier
 
         // ------------------------------------------------------------------ persistence
 
+        /// <summary>
+        /// Writes the local file synchronously and asks the cloud gate for a write. The gate blocks cloud writes until
+        /// the cloud copy has been read (#48), so a sign-in that only succeeds on the startup gate's Retry can never push
+        /// local state over newer cloud progress.
+        /// </summary>
         public void SaveNow(bool forceCloud)
         {
             if (Grid == null || Inventory == null) return;
+            FarmSaveData snapshot = BuildSnapshot(NowUnixMs);
+            WriteLocal(snapshot);
+            _localSavedAt = snapshot.savedAtUnixMs;
+            _dirty = false;
+            _cloud?.RequestWrite(forceCloud);
+        }
+
+        private FarmSaveData BuildSnapshot(long savedAt)
+        {
             var snapshot = new FarmSaveData
             {
                 version = 1,
-                savedAtUnixMs = NowUnixMs,
+                savedAtUnixMs = savedAt,
                 lastDay = CurrentDay,
                 inventory = Inventory.ToSaveData()
             };
             Grid.WriteToSaveData(snapshot.plots);
-            WriteLocal(snapshot);
-            _localSavedAt = snapshot.savedAtUnixMs;
+            return snapshot;
+        }
+
+        /// <summary>Read-before-write cloud gate for the "farm" slot (#48).</summary>
+        public CloudSyncGate<FarmSaveData> CloudGate => _cloud;
+        public bool IsCloudReconciled => _cloud != null && _cloud.IsReconciled;
+
+        private CloudSyncGate<FarmSaveData> CreateCloudGate(long startupLocalSavedAt) =>
+            new CloudSyncGate<FarmSaveData>("Farm",
+                () => PlayerSave.TryLoadAsync<FarmSaveData>(CloudKey),
+                data => PlayerSave.SaveAsync(CloudKey, data),
+                () => BuildSnapshot(_localSavedAt),
+                data => data.savedAtUnixMs,
+                AdoptCloud,
+                LiveOpsAllowsWrites,
+                () => Time.realtimeSinceStartup,
+                startupLocalSavedAt,
+                cloudSaveIntervalSeconds,
+                () => this != null,
+                msg => Debug.LogWarning(msg));
+
+        /// <summary>The cloud copy is newer than the save this device booted from: load it (#48, same rule as Guild).</summary>
+        private void AdoptCloud(FarmSaveData cloud)
+        {
+            Inventory.LoadFrom(cloud.inventory);
+            Grid.LoadFromSaveData(cloud.plots);
+            Grid.CatchUpAll(CurrentDay, NowUnixMs);
+            RefreshAllPlotVisuals();
+            WriteLocal(cloud);
+            _localSavedAt = cloud.savedAtUnixMs;
             _dirty = false;
-
-            bool due = forceCloud || Time.realtimeSinceStartup - _lastCloudSaveTime >= cloudSaveIntervalSeconds;
-            if (due) _ = SaveCloudAsync(snapshot);
-        }
-
-        private async Task SaveCloudAsync(FarmSaveData snapshot)
-        {
-            if (_cloudSaveInFlight || !LiveOpsAllowsWrites()) return;
-            _cloudSaveInFlight = true;
-            _lastCloudSaveTime = Time.realtimeSinceStartup;
-            try
-            {
-                bool ok = await PlayerSave.SaveAsync(CloudKey, snapshot);
-                LastSaveStatus = ok ? "Cloud synced" : "Local cache";
-            }
-            finally
-            {
-                _cloudSaveInFlight = false;
-            }
-        }
-
-        private async Task ReconcileWithCloudAsync()
-        {
-            if (!LiveOpsAllowsWrites()) return;
-            FarmSaveData cloud = await PlayerSave.LoadAsync<FarmSaveData>(CloudKey, null);
-            if (this == null) return;
-
-            if (cloud != null && !_dirty && cloud.savedAtUnixMs > _localSavedAt)
-            {
-                Inventory.LoadFrom(cloud.inventory);
-                Grid.LoadFromSaveData(cloud.plots);
-                Grid.CatchUpAll(CurrentDay, NowUnixMs);
-                RefreshAllPlotVisuals();
-                WriteLocal(cloud);
-                _localSavedAt = cloud.savedAtUnixMs;
-                LastSaveStatus = "Cloud synced";
-            }
-            else if (_localSavedAt > 0 && (cloud == null || _localSavedAt > cloud.savedAtUnixMs))
-            {
-                SaveNow(forceCloud: true);
-            }
+            Debug.Log("[Farm] Progress restored from cloud.");
         }
 
         private static bool LiveOpsAllowsWrites() =>
